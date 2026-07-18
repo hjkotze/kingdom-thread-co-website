@@ -203,4 +203,12 @@ async function getProducts() {
   }
 }
 
-module.exports = { getCategories, getProducts };
+// Reuses getProducts() rather than a dedicated single-record fetch — the
+// full catalogue is small (a handful of products), so this stays simple
+// instead of duplicating the live-first/cache-fallback logic for one row.
+async function getProductById(id) {
+  const products = await getProducts();
+  return products.find((p) => p.id === id) || null;
+}
+
+module.exports = { getCategories, getProducts, getProductById };

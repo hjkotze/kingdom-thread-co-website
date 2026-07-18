@@ -53,7 +53,7 @@ export default function DesignCTA({ scrollTo }) {
             symbol, a simple line illustration. Less is more.
           </p>
           <button
-            onClick={() => scrollTo("#contact")}
+            onClick={() => scrollTo("#shop")}
             className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-8 py-3.5 text-sm font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: "var(--radius)" }}
           >

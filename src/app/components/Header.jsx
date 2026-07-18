@@ -6,7 +6,6 @@ const NAV_LINKS = [
   { label: "Products", href: "#products" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "Shop", href: "#shop" },
-  { label: "Contact", href: "#contact" },
 ];
 
 export default function Header({
@@ -47,7 +46,7 @@ export default function Header({
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => scrollTo("#contact")}
+            onClick={() => scrollTo("#shop")}
             className="hidden md:inline-flex items-center gap-2 bg-accent text-accent-foreground px-5 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
             style={{ borderRadius: "var(--radius)" }}
           >
@@ -98,7 +97,7 @@ export default function Header({
             </button>
           ))}
           <button
-            onClick={() => scrollTo("#contact")}
+            onClick={() => scrollTo("#shop")}
             className="mt-2 bg-accent text-accent-foreground px-5 py-3 text-sm font-medium text-left"
             style={{ borderRadius: "var(--radius)" }}
           >
