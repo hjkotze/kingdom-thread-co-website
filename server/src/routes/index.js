@@ -4,6 +4,7 @@ const adminAuthRoutes = require("../modules/auth/adminAuth.routes");
 const productsRoutes = require("../modules/products/products.routes");
 const threadColoursRoutes = require("../modules/threadColours/threadColours.routes");
 const quotesRoutes = require("../modules/quotes/quotes.routes");
+const attachmentsRoutes = require("../modules/attachments/attachments.routes");
 
 const router = express.Router();
 
@@ -12,5 +13,6 @@ router.use("/admin/auth", adminAuthRoutes);
 router.use("/", productsRoutes);
 router.use("/", threadColoursRoutes);
 router.use("/quotes", quotesRoutes);
+router.use("/quotes/:quoteId/attachments", attachmentsRoutes);
 
 module.exports = router;

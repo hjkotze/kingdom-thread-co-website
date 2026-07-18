@@ -8,11 +8,15 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch(path, options = {}) {
+  // FormData bodies (file uploads) must NOT get a manually-set Content-Type
+  // — the browser needs to set it itself to include the multipart boundary.
+  const isFormData = options.body instanceof FormData;
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include", // send/receive the session cookie
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...options.headers,
     },
   });

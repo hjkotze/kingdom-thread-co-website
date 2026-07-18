@@ -28,11 +28,18 @@ function persist(draft) {
 // until the final submit step.
 export function QuoteDraftProvider({ children }) {
   const [draft, setDraftState] = useState(loadDraft);
+  // File objects can't be JSON-serialized into sessionStorage, so they live
+  // only in memory. They survive the client-side login/register redirect
+  // (the app never unmounts for that), but not a hard page refresh — an
+  // acceptable gap, since no web app can persist File objects across a
+  // reload without much heavier machinery (IndexedDB) than this needs.
+  const [files, setFilesState] = useState({ image: null, text: null });
 
   const startDraft = useCallback((productId, fields) => {
     const next = { productId, ...fields };
     setDraftState(next);
     persist(next);
+    setFilesState({ image: null, text: null });
   }, []);
 
   const updateDraft = useCallback((fields) => {
@@ -43,13 +50,18 @@ export function QuoteDraftProvider({ children }) {
     });
   }, []);
 
+  const setDraftFile = useCallback((type, file) => {
+    setFilesState((prev) => ({ ...prev, [type]: file }));
+  }, []);
+
   const clearDraft = useCallback(() => {
     setDraftState(null);
     persist(null);
+    setFilesState({ image: null, text: null });
   }, []);
 
   return (
-    <QuoteDraftContext.Provider value={{ draft, startDraft, updateDraft, clearDraft }}>
+    <QuoteDraftContext.Provider value={{ draft, files, startDraft, updateDraft, setDraftFile, clearDraft }}>
       {children}
     </QuoteDraftContext.Provider>
   );

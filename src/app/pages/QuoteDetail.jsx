@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { getQuote } from "../lib/api/quotes";
+import AttachmentsSection from "../components/quote/AttachmentsSection";
 
 const STATUS_LABELS = {
   new: "New",
@@ -17,6 +18,10 @@ export default function QuoteDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const refetch = useCallback(() => {
+    return getQuote(id).then((result) => setData(result));
+  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +54,7 @@ export default function QuoteDetail() {
     );
   }
 
-  const { quote, messages } = data;
+  const { quote, messages, attachments } = data;
   const pendingCustomerResponse = quote.status === "awaiting_customer";
 
   return (
@@ -107,6 +112,13 @@ export default function QuoteDetail() {
             {quote.threadColourCode && <Row label="Thread colour" value={quote.threadColourCode} />}
           </dl>
         </div>
+
+        {quote.customisable && (
+          <div className="mb-8">
+            <h2 className="text-sm text-foreground font-medium mb-4">Design files</h2>
+            <AttachmentsSection quoteId={quote.id} attachments={attachments} onUploaded={refetch} />
+          </div>
+        )}
 
         <h2 className="text-sm text-foreground font-medium mb-4">Communication</h2>
         <div className="flex flex-col gap-3">

@@ -1,3 +1,5 @@
+const path = require("path");
+
 require("dotenv").config();
 
 function required(name) {
@@ -33,4 +35,8 @@ module.exports = {
     apiKey: process.env.AIRTABLE_API_KEY || "",
     baseId: process.env.AIRTABLE_BASE_ID || "",
   },
+
+  // Outside the web root on HostKing — never served by a static
+  // middleware, only through the authenticated download endpoint.
+  uploadsDir: process.env.UPLOADS_DIR || path.join(__dirname, "../../uploads"),
 };

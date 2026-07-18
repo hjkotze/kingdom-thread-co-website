@@ -6,6 +6,7 @@ import { useQuoteDraft } from "../lib/quote/QuoteDraftContext";
 import { FONTS } from "../lib/fonts";
 import AuthCard from "../components/auth/AuthCard";
 import FormSelect from "../components/quote/FormSelect";
+import FileDropzone from "../components/quote/FileDropzone";
 
 const COMMON_FONT_COLOURS = [
   { name: "Black", hex: "#000000" },
@@ -23,7 +24,7 @@ const COMMON_FONT_COLOURS = [
 export default function ProductQuoteCustomise() {
   const { productId } = useParams();
   const navigate = useNavigate();
-  const { draft, updateDraft } = useQuoteDraft();
+  const { draft, files, updateDraft, setDraftFile } = useQuoteDraft();
 
   const [product, setProduct] = useState(null);
   const [threadColours, setThreadColours] = useState([]);
@@ -92,6 +93,22 @@ export default function ProductQuoteCustomise() {
             style={{ borderRadius: "var(--radius)" }}
           />
         </div>
+
+        <FileDropzone
+          label="Upload an image (optional)"
+          accept=".png,.jpg,.jpeg,.webp,.svg"
+          helperText="PNG, JPG, WEBP, SVG · max 20 MB"
+          fileName={files.image?.name}
+          onSelect={(file) => setDraftFile("image", file)}
+        />
+
+        <FileDropzone
+          label="Upload a text/wording file (optional)"
+          accept=".txt,.pdf,.doc,.docx"
+          helperText="TXT, PDF, DOC, DOCX · max 20 MB"
+          fileName={files.text?.name}
+          onSelect={(file) => setDraftFile("text", file)}
+        />
 
         <FormSelect label="Font" value={font} onChange={(e) => setFont(e.target.value)} options={FONTS} />
 

@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { apiFetch, ApiError } from "../lib/api/client";
 import { createQuote } from "../lib/api/quotes";
+import { uploadAttachment } from "../lib/api/attachments";
 import { useQuoteDraft } from "../lib/quote/QuoteDraftContext";
 import AuthCard from "../components/auth/AuthCard";
 
 export default function QuoteReview() {
   const navigate = useNavigate();
-  const { draft, clearDraft } = useQuoteDraft();
+  const { draft, files, clearDraft } = useQuoteDraft();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +47,17 @@ export default function QuoteReview() {
         fontColour: draft.fontColour,
         threadColourCode: draft.threadColourCode,
       });
+
+      // Best-effort: the quote request itself already succeeded above, so a
+      // failed upload here shouldn't block the customer from reaching their
+      // confirmation — they can retry the upload from the quote detail page.
+      if (files.image) {
+        await uploadAttachment(quote.id, "image", files.image).catch((err) => console.error(err));
+      }
+      if (files.text) {
+        await uploadAttachment(quote.id, "text", files.text).catch((err) => console.error(err));
+      }
+
       clearDraft();
       navigate(`/account/quotes/${quote.id}`, { replace: true });
     } catch (err) {
@@ -80,6 +92,8 @@ export default function QuoteReview() {
           />
         )}
         {draft.threadColourCode && <Row label="Thread colour" value={draft.threadColourCode} />}
+        {files.image && <Row label="Image" value={files.image.name} />}
+        {files.text && <Row label="Text file" value={files.text.name} />}
       </dl>
 
       <button

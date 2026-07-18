@@ -1,4 +1,5 @@
 const quotesService = require("./quotes.service");
+const attachmentsService = require("../attachments/attachments.service");
 
 async function create(req, res, next) {
   try {
@@ -25,9 +26,11 @@ async function getOne(req, res, next) {
   try {
     const result = await quotesService.getQuoteForCustomer(req.session.userId, req.params.id);
     if (!result) return res.status(404).json({ error: "Quote not found" });
+    const attachments = await attachmentsService.listAttachmentsForQuote(result.quote.id);
     res.json({
       quote: quotesService.quoteRowToPublic(result.quote),
       messages: result.messages.map(quotesService.messageRowToPublic),
+      attachments: attachments.map(attachmentsService.attachmentRowToPublic),
     });
   } catch (err) {
     next(err);
