@@ -2,6 +2,9 @@ const db = require("../../config/db");
 const productsService = require("../products/products.service");
 const threadColoursService = require("../threadColours/threadColours.service");
 const { FONTS } = require("../../lib/fonts");
+const mailer = require("../../lib/mailer");
+const emailTemplates = require("../../lib/emailTemplates");
+const env = require("../../config/env");
 
 const HEX_COLOUR_RE = /^#[0-9A-Fa-f]{6}$/;
 
@@ -74,7 +77,7 @@ async function createQuote(customerId, input) {
   const quoteData = await validateAndBuildQuoteInput(input);
   const now = new Date();
 
-  return db.transaction(async (trx) => {
+  const { quote, initialMessageId } = await db.transaction(async (trx) => {
     const [id] = await trx("quotes").insert({
       customer_id: customerId,
       product_airtable_id: quoteData.productAirtableId,
@@ -96,7 +99,7 @@ async function createQuote(customerId, input) {
       ? quoteData.requirementsText
       : `Quote request for ${quoteData.productNameSnapshot} (${quoteData.size}, ${quoteData.colour}, qty ${quoteData.quantity}).`;
 
-    await trx("messages").insert({
+    const [messageId] = await trx("messages").insert({
       quote_id: id,
       sender_type: "customer",
       sender_user_id: customerId,
@@ -104,8 +107,28 @@ async function createQuote(customerId, input) {
       body_text: initialMessageBody,
     });
 
-    return trx("quotes").where({ id }).first();
+    return { quote: await trx("quotes").where({ id }).first(), initialMessageId: messageId };
   });
+
+  // Best-effort: the quote is already committed above, so a mail failure
+  // here shouldn't fail the request — it just means no confirmation email
+  // went out, which is logged for manual follow-up.
+  try {
+    const customer = await db("users").where({ id: customerId }).first();
+    const emailMessageId = mailer.generateMessageId(quote.id);
+    const confirmation = emailTemplates.quoteConfirmationEmail(quote);
+    await mailer.sendMail({ to: customer.email, messageId: emailMessageId, ...confirmation });
+    // This Message-ID becomes the thread anchor future replies get matched
+    // against (see scripts/cron/ingest-emails.js).
+    await db("messages").where({ id: initialMessageId }).update({ email_message_id: emailMessageId });
+
+    const notification = emailTemplates.newQuoteNotification(quote, customer);
+    await mailer.sendMail({ to: env.companyNotificationEmail, ...notification });
+  } catch (err) {
+    console.error(`Failed to send quote confirmation/notification email for quote #${quote.id}:`, err.message);
+  }
+
+  return quote;
 }
 
 async function listQuotesForCustomer(customerId) {

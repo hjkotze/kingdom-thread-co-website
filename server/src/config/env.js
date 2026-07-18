@@ -39,4 +39,28 @@ module.exports = {
   // Outside the web root on HostKing — never served by a static
   // middleware, only through the authenticated download endpoint.
   uploadsDir: process.env.UPLOADS_DIR || path.join(__dirname, "../../uploads"),
+
+  smtp: {
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT) || 587,
+    user: process.env.SMTP_USER || "",
+    password: process.env.SMTP_PASSWORD || "",
+  },
+
+  imap: {
+    host: process.env.IMAP_HOST || "",
+    port: Number(process.env.IMAP_PORT) || 993,
+    user: process.env.IMAP_USER || "",
+    password: process.env.IMAP_PASSWORD || "",
+  },
+
+  // Where new-quote / new-reply notification emails are sent — the
+  // person(s) actually running the company inbox. Defaults to the SMTP
+  // mailbox itself if not set separately.
+  companyNotificationEmail: process.env.COMPANY_NOTIFICATION_EMAIL || process.env.SMTP_USER || "",
+
+  // Domain used to construct our own outbound Message-IDs
+  // (<quote-123-abc123@mailDomain>). Derived from the SMTP user's domain
+  // if not set explicitly.
+  mailDomain: process.env.MAIL_DOMAIN || (process.env.SMTP_USER || "").split("@")[1] || "example.com",
 };

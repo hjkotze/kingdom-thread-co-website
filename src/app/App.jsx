@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Account from "./pages/Account";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminQuoteDetail from "./pages/AdminQuoteDetail";
 import ProductQuoteStart from "./pages/ProductQuoteStart";
 import ProductQuoteCustomise from "./pages/ProductQuoteCustomise";
 import QuoteReview from "./pages/QuoteReview";
@@ -67,6 +68,14 @@ export default function App() {
                 element={
                   <ProtectedRoute role="admin">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/quotes/:id"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminQuoteDetail />
                   </ProtectedRoute>
                 }
               />

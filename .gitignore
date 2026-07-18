@@ -12,3 +12,6 @@ dist/
 
 # server uploads (local dev)
 server/uploads/
+
+# dev/test reference — contains real (throwaway) local credentials
+DEV_CREDENTIALS.md
