@@ -82,6 +82,21 @@ function customerAcceptedNotification(quote) {
   };
 }
 
+function verificationEmail(user, verifyUrl) {
+  return {
+    subject: "Verify your email address",
+    text: [
+      `Hi ${user.full_name},`,
+      ``,
+      `Please confirm your email address to activate your account:`,
+      ``,
+      verifyUrl,
+      ``,
+      `This link expires in 24 hours. If you didn't create an account, you can ignore this email.`,
+    ].join("\n"),
+  };
+}
+
 module.exports = {
   subjectFor,
   quoteConfirmationEmail,
@@ -90,4 +105,5 @@ module.exports = {
   companyReplyEmail,
   formalQuoteReadyEmail,
   customerAcceptedNotification,
+  verificationEmail,
 };

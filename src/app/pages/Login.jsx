@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../lib/auth/AuthContext";
+import { resendVerification } from "../lib/api/auth";
 import { ApiError } from "../lib/api/client";
 import AuthCard from "../components/auth/AuthCard";
 import AuthFormField from "../components/auth/AuthFormField";
@@ -13,20 +14,37 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendState, setResendState] = useState("idle"); // idle | sending | sent
 
   const resumeTo = location.state?.from || "/";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNeedsVerification(false);
     setSubmitting(true);
     try {
       await login({ email, password });
       navigate(resumeTo, { replace: true, state: location.state });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      if (err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED") {
+        setNeedsVerification(true);
+        setError(err.message);
+      } else {
+        setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResendState("sending");
+    try {
+      await resendVerification(email);
+    } finally {
+      setResendState("sent");
     }
   };
 
@@ -72,6 +90,18 @@ export default function Login() {
         >
           {submitting ? "Logging in…" : "Log in"}
         </button>
+        {needsVerification && (
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resendState !== "idle"}
+            className="text-sm text-accent font-medium disabled:opacity-60"
+          >
+            {resendState === "idle" && "Resend verification email"}
+            {resendState === "sending" && "Sending…"}
+            {resendState === "sent" && "Sent — check your inbox"}
+          </button>
+        )}
       </form>
     </AuthCard>
   );

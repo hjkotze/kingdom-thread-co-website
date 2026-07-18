@@ -1,9 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -26,7 +27,7 @@ export async function apiFetch(path, options = {}) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    throw new ApiError(data?.error || "Something went wrong.", res.status);
+    throw new ApiError(data?.error || "Something went wrong.", res.status, data?.code);
   }
 
   return data;

@@ -1,7 +1,11 @@
 const authService = require("./auth.service");
+const mailer = require("../../lib/mailer");
+const emailTemplates = require("../../lib/emailTemplates");
+const env = require("../../config/env");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const RESEND_COOLDOWN_MINUTES = 2;
 
 function validateRegisterInput({ email, password, fullName }) {
   if (!email || !EMAIL_RE.test(email)) return "A valid email address is required.";
@@ -17,8 +21,18 @@ function establishSession(req, user) {
   req.session.role = user.role;
 }
 
+async function sendVerificationEmail(user) {
+  const { raw, hash, expiresAt } = authService.generateVerificationToken();
+  await authService.setVerificationToken(user.id, { hash, expiresAt });
+  const verifyUrl = `${env.frontendUrl}/verify-email?token=${raw}`;
+  const { subject, text } = emailTemplates.verificationEmail(user, verifyUrl);
+  await mailer.sendMail({ to: user.email, subject, text });
+}
+
 // Customer self-registration. Admin accounts are never created through a
-// public endpoint — see server/scripts/create-admin.js.
+// public endpoint — see server/scripts/create-admin.js. Deliberately does
+// NOT establish a session: an unverified account can't be used for
+// anything until the link in the verification email is clicked.
 async function register(req, res, next) {
   try {
     const { email, password, fullName, phone } = req.body || {};
@@ -31,8 +45,72 @@ async function register(req, res, next) {
     }
 
     const user = await authService.createUser({ email, password, fullName, phone, role: "customer" });
+
+    try {
+      await sendVerificationEmail(user);
+    } catch (err) {
+      // Sending the verification email is the whole point of this account
+      // existing right now — an unverified, unverifiable row left behind
+      // would just be dead weight, so undo the creation rather than leave
+      // it stranded.
+      await authService.deleteUser(user.id);
+      console.error(`Failed to send verification email to ${user.email}:`, err.message);
+      return res.status(502).json({ error: "Couldn't send the verification email. Please try again." });
+    }
+
+    res.status(201).json({ message: "Check your email to verify your account before logging in.", email: user.email });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function verifyEmail(req, res, next) {
+  try {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: "Missing verification token." });
+
+    const user = await authService.findUserByVerificationToken(token);
+    if (!user) return res.status(400).json({ error: "Invalid or expired verification link." });
+    if (user.email_verified) {
+      // Already verified (e.g. link clicked twice) — treat as success
+      // rather than an error, and still log them in.
+      establishSession(req, user);
+      return res.json({ user: authService.toPublicUser(user) });
+    }
+    if (new Date(user.email_verification_expires_at) < new Date()) {
+      return res.status(400).json({ error: "This verification link has expired. Request a new one." });
+    }
+
+    await authService.markEmailVerified(user.id);
     establishSession(req, user);
-    res.status(201).json({ user: authService.toPublicUser(user) });
+    res.json({ user: authService.toPublicUser({ ...user, email_verified: true }) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resendVerification(req, res, next) {
+  try {
+    const { email } = req.body || {};
+    // Same generic response regardless of what's actually true — doesn't
+    // reveal whether an account exists for this email (account
+    // enumeration).
+    const genericResponse = () =>
+      res.json({ message: "If an account exists for this email and isn't verified yet, we've sent a new link." });
+
+    if (!email) return genericResponse();
+    const user = await authService.findUserByEmail(email);
+    if (!user || user.email_verified) return genericResponse();
+
+    if (user.email_verification_sent_at) {
+      const elapsedMinutes = (Date.now() - new Date(user.email_verification_sent_at).getTime()) / (60 * 1000);
+      if (elapsedMinutes < RESEND_COOLDOWN_MINUTES) return genericResponse();
+    }
+
+    await sendVerificationEmail(user).catch((err) => {
+      console.error(`Failed to resend verification email to ${user.email}:`, err.message);
+    });
+    genericResponse();
   } catch (err) {
     next(err);
   }
@@ -58,6 +136,14 @@ function makeLogin(expectedRole) {
 
       const passwordOk = await authService.verifyPassword(user, password);
       if (!passwordOk) return genericError();
+
+      // Checked only after the password is confirmed correct — telling an
+      // unverified account "verify your email" is only safe to reveal once
+      // they've already proven they own the credentials, otherwise it's a
+      // second account-enumeration channel alongside genericError above.
+      if (!user.email_verified) {
+        return res.status(403).json({ error: "Please verify your email before logging in.", code: "EMAIL_NOT_VERIFIED" });
+      }
 
       establishSession(req, user);
       res.json({ user: authService.toPublicUser(user) });
@@ -90,6 +176,8 @@ async function me(req, res, next) {
 
 module.exports = {
   register,
+  verifyEmail,
+  resendVerification,
   loginCustomer: makeLogin("customer"),
   loginAdmin: makeLogin("admin"),
   logout,

@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useAuth } from "../lib/auth/AuthContext";
+import { resendVerification } from "../lib/api/auth";
 import { ApiError } from "../lib/api/client";
 import AuthCard from "../components/auth/AuthCard";
 import AuthFormField from "../components/auth/AuthFormField";
 
 export default function Register() {
   const { register } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,8 +16,8 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  const resumeTo = location.state?.from || "/";
+  const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [resendState, setResendState] = useState("idle"); // idle | sending | sent
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,14 +30,43 @@ export default function Register() {
 
     setSubmitting(true);
     try {
-      await register({ email, password, fullName, phone });
-      navigate(resumeTo, { replace: true, state: location.state });
+      const data = await register({ email, password, fullName, phone });
+      setRegisteredEmail(data.email);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleResend = async () => {
+    setResendState("sending");
+    try {
+      await resendVerification(registeredEmail);
+    } finally {
+      setResendState("sent");
+    }
+  };
+
+  if (registeredEmail) {
+    return (
+      <AuthCard eyebrow="Almost there" title="Check your email">
+        <p className="text-sm text-foreground leading-relaxed">
+          We've sent a verification link to <strong>{registeredEmail}</strong>. Click it to activate your account —
+          you won't be able to log in until then.
+        </p>
+        <button
+          onClick={handleResend}
+          disabled={resendState !== "idle"}
+          className="text-sm text-accent font-medium self-start disabled:opacity-60"
+        >
+          {resendState === "idle" && "Didn't get it? Resend the email"}
+          {resendState === "sending" && "Sending…"}
+          {resendState === "sent" && "Sent — check your inbox"}
+        </button>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard

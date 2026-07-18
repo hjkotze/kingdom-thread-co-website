@@ -19,6 +19,10 @@ module.exports = {
     .map((origin) => origin.trim())
     .filter(Boolean),
 
+  // Canonical URL used to build links in outbound emails (verification,
+  // etc.) — the first FRONTEND_ORIGINS entry if not set explicitly.
+  frontendUrl: process.env.FRONTEND_URL || (process.env.FRONTEND_ORIGINS || "http://localhost:5173").split(",")[0].trim(),
+
   db: {
     host: process.env.DB_HOST || "localhost",
     port: Number(process.env.DB_PORT) || 3306,

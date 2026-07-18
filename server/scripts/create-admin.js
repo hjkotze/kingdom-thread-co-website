@@ -29,7 +29,7 @@ async function main() {
     return;
   }
 
-  const user = await authService.createUser({ email, password, fullName: name, role: "admin" });
+  const user = await authService.createUser({ email, password, fullName: name, role: "admin", emailVerified: true });
   console.log(`Created admin user #${user.id} (${user.email}).`);
 }
 
