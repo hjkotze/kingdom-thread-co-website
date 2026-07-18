@@ -15,6 +15,14 @@ export function resendVerification(email) {
   return apiFetch("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) });
 }
 
+export function forgotPassword(email) {
+  return apiFetch("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export function resetPassword(token, password) {
+  return apiFetch("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, password }) });
+}
+
 export function loginCustomer({ email, password }) {
   return apiFetch("/auth/login", {
     method: "POST",

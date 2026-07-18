@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "../lib/auth/AuthContext";
 import { ApiError } from "../lib/api/client";
 import AuthCard from "../components/auth/AuthCard";
@@ -56,6 +56,9 @@ export default function AdminLogin() {
         >
           {submitting ? "Logging in…" : "Log in"}
         </button>
+        <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground self-center -mt-1">
+          Forgot your password?
+        </Link>
       </form>
     </AuthCard>
   );

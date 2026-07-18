@@ -90,6 +90,9 @@ export default function Login() {
         >
           {submitting ? "Logging in…" : "Log in"}
         </button>
+        <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground self-center -mt-1">
+          Forgot your password?
+        </Link>
         {needsVerification && (
           <button
             type="button"

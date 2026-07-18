@@ -17,13 +17,16 @@ export function AuthProvider({ children }) {
 
   // Registration no longer establishes a session — the account is
   // unverified and unusable until the email verification link is clicked
-  // (see VerifyEmail.jsx / setVerifiedUser below).
+  // (see VerifyEmail.jsx / setAuthenticatedUser below).
   const register = useCallback(async (input) => {
     return authApi.registerCustomer(input);
   }, []);
 
-  const setVerifiedUser = useCallback((verifiedUser) => {
-    setUser(verifiedUser);
+  // Used by any flow that establishes a session server-side without going
+  // through login() itself — email verification and password reset both
+  // log the user in as their final step.
+  const setAuthenticatedUser = useCallback((authenticatedUser) => {
+    setUser(authenticatedUser);
   }, []);
 
   const login = useCallback(async (input) => {
@@ -43,7 +46,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, [user]);
 
-  const value = { user, loading, register, setVerifiedUser, login, loginAsAdmin, logout };
+  const value = { user, loading, register, setAuthenticatedUser, login, loginAsAdmin, logout };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

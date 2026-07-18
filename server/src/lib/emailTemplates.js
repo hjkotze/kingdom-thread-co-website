@@ -97,11 +97,41 @@ function verificationEmail(user, verifyUrl) {
   };
 }
 
+function passwordResetEmail(user, resetUrl) {
+  return {
+    subject: "Reset your password",
+    text: [
+      `Hi ${user.full_name},`,
+      ``,
+      `We received a request to reset your password. Click below to choose a new one:`,
+      ``,
+      resetUrl,
+      ``,
+      `This link expires in 1 hour. If you didn't request this, you can ignore this email — your password won't be changed.`,
+    ].join("\n"),
+  };
+}
+
+function passwordChangedNotification(user) {
+  return {
+    subject: "Your password was changed",
+    text: [
+      `Hi ${user.full_name},`,
+      ``,
+      `This is a confirmation that the password for your account (${user.email}) was just changed.`,
+      ``,
+      `If this wasn't you, please contact us immediately.`,
+    ].join("\n"),
+  };
+}
+
 module.exports = {
   subjectFor,
   quoteConfirmationEmail,
   newReplyFromCustomerNotification,
   newQuoteNotification,
+  passwordResetEmail,
+  passwordChangedNotification,
   companyReplyEmail,
   formalQuoteReadyEmail,
   customerAcceptedNotification,

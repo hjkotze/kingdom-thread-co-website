@@ -6,6 +6,7 @@ const env = require("../../config/env");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const RESEND_COOLDOWN_MINUTES = 2;
+const RESET_COOLDOWN_MINUTES = 2;
 
 function validateRegisterInput({ email, password, fullName }) {
   if (!email || !EMAIL_RE.test(email)) return "A valid email address is required.";
@@ -116,6 +117,80 @@ async function resendVerification(req, res, next) {
   }
 }
 
+async function sendPasswordResetEmail(user) {
+  const { raw, hash, expiresAt } = authService.generatePasswordResetToken();
+  await authService.setPasswordResetToken(user.id, { hash, expiresAt });
+  const resetUrl = `${env.frontendUrl}/reset-password?token=${raw}`;
+  const { subject, text } = emailTemplates.passwordResetEmail(user, resetUrl);
+  await mailer.sendMail({ to: user.email, subject, text });
+}
+
+// Works for any role by email (customer or admin) — the token itself is
+// the authorization, not which login form was used to get here. Same
+// generic response regardless of outcome, same reasoning as
+// resendVerification: doesn't reveal whether an account exists.
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body || {};
+    const genericResponse = () =>
+      res.json({ message: "If an account exists for this email, we've sent a password reset link." });
+
+    if (!email) return genericResponse();
+    const user = await authService.findUserByEmail(email);
+    if (!user) return genericResponse();
+
+    if (user.password_reset_sent_at) {
+      const elapsedMinutes = (Date.now() - new Date(user.password_reset_sent_at).getTime()) / (60 * 1000);
+      if (elapsedMinutes < RESET_COOLDOWN_MINUTES) return genericResponse();
+    }
+
+    await sendPasswordResetEmail(user).catch((err) => {
+      console.error(`Failed to send password reset email to ${user.email}:`, err.message);
+    });
+    genericResponse();
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { token, password } = req.body || {};
+    if (!token) return res.status(400).json({ error: "Missing reset token." });
+    if (!password || password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    }
+
+    const user = await authService.findUserByPasswordResetToken(token);
+    if (!user || !user.password_reset_expires_at) {
+      return res.status(400).json({ error: "Invalid or expired reset link." });
+    }
+    if (new Date(user.password_reset_expires_at) < new Date()) {
+      return res.status(400).json({ error: "This reset link has expired. Request a new one." });
+    }
+
+    await authService.resetPassword(user.id, password);
+    // The whole reason a password reset exists is "someone else might
+    // know my password" — end every session that was already logged in,
+    // not just leave them running alongside a new one.
+    await authService.invalidateAllSessions(user.id);
+
+    // Best-effort — the password is already changed and the account is
+    // usable regardless of whether this confirmation email goes out.
+    try {
+      const notification = emailTemplates.passwordChangedNotification(user);
+      await mailer.sendMail({ to: user.email, ...notification });
+    } catch (err) {
+      console.error(`Failed to send password-changed notification to ${user.email}:`, err.message);
+    }
+
+    establishSession(req, user);
+    res.json({ user: authService.toPublicUser({ ...user, email_verified: true }) });
+  } catch (err) {
+    next(err);
+  }
+}
+
 function makeLogin(expectedRole) {
   return async (req, res, next) => {
     try {
@@ -178,6 +253,8 @@ module.exports = {
   register,
   verifyEmail,
   resendVerification,
+  forgotPassword,
+  resetPassword,
   loginCustomer: makeLogin("customer"),
   loginAdmin: makeLogin("admin"),
   logout,

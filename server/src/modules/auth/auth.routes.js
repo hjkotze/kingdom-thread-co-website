@@ -16,6 +16,12 @@ router.post(
   controller.resendVerification,
 );
 router.post("/verify-email", controller.verifyEmail);
+// Password reset is role-agnostic (works for customer or admin accounts by
+// email — the reset token is the authorization, not which login form was
+// used to reach it), so it lives here rather than duplicated under
+// /admin/auth too. Same email-quota reasoning for the rate limit.
+router.post("/forgot-password", rateLimit("forgot-password", { max: 5, windowMinutes: 60 }), controller.forgotPassword);
+router.post("/reset-password", controller.resetPassword);
 router.post("/login", controller.loginCustomer);
 router.post("/logout", controller.logout);
 router.get("/me", controller.me);

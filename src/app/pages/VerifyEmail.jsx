@@ -9,7 +9,7 @@ import AuthCard from "../components/auth/AuthCard";
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
-  const { setVerifiedUser } = useAuth();
+  const { setAuthenticatedUser } = useAuth();
   const { draft } = useQuoteDraft();
   const navigate = useNavigate();
   const [status, setStatus] = useState("verifying"); // verifying | error
@@ -23,7 +23,7 @@ export default function VerifyEmail() {
     }
     verifyEmail(token)
       .then((data) => {
-        setVerifiedUser(data.user);
+        setAuthenticatedUser(data.user);
         // If this is the same tab that started a quote request before being
         // sent off to verify, the sessionStorage-backed draft is still
         // here — resume it. A different tab (the common case, opening the
