@@ -1,4 +1,6 @@
-import { Menu, X, ShoppingBag, ArrowRight } from "lucide-react";
+import { Menu, X, ShoppingBag, ArrowRight, User } from "lucide-react";
+import { Link } from "react-router";
+import { useAuth } from "../lib/auth/AuthContext";
 
 const NAV_LINKS = [
   { label: "Products", href: "#products" },
@@ -13,6 +15,8 @@ export default function Header({
   cartCount,
   scrollTo,
 }) {
+  const { user, loading } = useAuth();
+
   return (
     <header className="fixed top-0 inset-x-0 z-50 bg-background/90 backdrop-blur-sm border-b border-border">
       <div className="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
@@ -49,6 +53,16 @@ export default function Header({
           >
             Order Now <ArrowRight size={14} />
           </button>
+
+          {!loading && (!user || user.role === "customer") && (
+            <Link
+              to={user ? "/account" : "/login"}
+              className="hidden md:inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <User size={16} />
+              {user ? user.fullName.split(" ")[0] : "Log in"}
+            </Link>
+          )}
 
           <button className="relative p-1">
             <ShoppingBag

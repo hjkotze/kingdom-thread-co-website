@@ -1,89 +1,48 @@
-import { useState, useRef } from "react";
-import Header from "./components/Header";
-import Hero from "./components/Hero";
-import ProductCategories from "./components/ProductCategories";
-import HowItWorks from "./components/HowItWorks";
-import Shop from "./components/Shop";
-import DesignCTA from "./components/DesignCTA";
-import Contact from "./components/Contact";
-import Footer from "./components/Footer";
-
-function productToSelectValue(category, name) {
-  if (category === "blanket-budget") return "budget-blanket";
-  if (category === "blanket-premium") return "premium-blanket";
-  if (category === "pillow-budget") return "budget-pillow";
-  if (category === "pillow-premium") return "premium-pillow";
-  if (category === "duvet-budget") return "budget-duvet";
-  if (category === "duvet-premium") return "premium-duvet";
-  if (name.toLowerCase().includes("ankle"))
-    return "ankle-socks";
-  if (name.toLowerCase().includes("crew")) return "crew-socks";
-  return "";
-}
+import { BrowserRouter, Routes, Route } from "react-router";
+import { AuthProvider } from "./lib/auth/AuthContext";
+import ProtectedRoute from "./lib/auth/ProtectedRoute";
+import HomePage from "./pages/HomePage";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Account from "./pages/Account";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 
 export default function App() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [cartCount] = useState(0);
-
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const contactRef = useRef(null);
-
-  const scrollTo = (href) => {
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-    setMenuOpen(false);
-  };
-
-  const handleOrderNow = (product) => {
-    const selectVal = productToSelectValue(
-      product.category,
-      product.name,
-    );
-    setSelectedProduct(selectVal);
-    setTimeout(() => {
-      contactRef.current?.scrollIntoView({
-        behavior: "smooth",
-      });
-    }, 50);
-  };
-
   return (
     <div
       className="min-h-screen bg-background text-foreground"
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
-      <Header
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        cartCount={cartCount}
-        scrollTo={scrollTo}
-      />
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route
+              path="/account"
+              element={
+                <ProtectedRoute role="customer">
+                  <Account />
+                </ProtectedRoute>
+              }
+            />
 
-      <Hero scrollTo={scrollTo} />
-
-      <ProductCategories
-        setActiveFilter={setActiveFilter}
-        scrollTo={scrollTo}
-      />
-
-      <HowItWorks scrollTo={scrollTo} />
-
-      <Shop
-        activeFilter={activeFilter}
-        setActiveFilter={setActiveFilter}
-        onOrderNow={handleOrderNow}
-      />
-
-      <DesignCTA scrollTo={scrollTo} />
-
-      <Contact
-        sectionRef={contactRef}
-        selectedProduct={selectedProduct}
-        setSelectedProduct={setSelectedProduct}
-      />
-
-      <Footer scrollTo={scrollTo} />
+            {/* Admin surface: no links to these routes anywhere in the
+                customer-facing UI (§1) — reachable only by direct URL. */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
     </div>
   );
 }
