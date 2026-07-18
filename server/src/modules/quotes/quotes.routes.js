@@ -11,5 +11,6 @@ router.use(requireRole("customer"));
 router.post("/", controller.create);
 router.get("/", controller.list);
 router.get("/:id", controller.getOne);
+router.post("/:id/accept", controller.accept);
 
 module.exports = router;

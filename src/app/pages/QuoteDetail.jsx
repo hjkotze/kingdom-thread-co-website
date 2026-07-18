@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { getQuote } from "../lib/api/quotes";
 import AttachmentsSection from "../components/quote/AttachmentsSection";
+import CustomerFormalQuoteSection from "../components/quote/CustomerFormalQuoteSection";
 
 const STATUS_LABELS = {
   new: "New",
@@ -54,8 +55,11 @@ export default function QuoteDetail() {
     );
   }
 
-  const { quote, messages, attachments } = data;
-  const pendingCustomerResponse = quote.status === "awaiting_customer";
+  const { quote, messages, attachments, snapshots } = data;
+  const latestSnapshot = snapshots[0] || null;
+  // "finalised" means a formal quote exists and hasn't been accepted yet —
+  // just as much a pending action for the customer as an unanswered reply.
+  const pendingCustomerResponse = quote.status === "awaiting_customer" || quote.status === "finalised";
 
   return (
     <section className="min-h-screen bg-background py-28 px-6">
@@ -119,6 +123,8 @@ export default function QuoteDetail() {
             <AttachmentsSection quoteId={quote.id} attachments={attachments} onUploaded={refetch} />
           </div>
         )}
+
+        <CustomerFormalQuoteSection quote={quote} snapshot={latestSnapshot} onAccepted={refetch} />
 
         <h2 className="text-sm text-foreground font-medium mb-4">Communication</h2>
         <div className="flex flex-col gap-3">

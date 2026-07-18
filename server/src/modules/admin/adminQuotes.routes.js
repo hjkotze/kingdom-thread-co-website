@@ -8,5 +8,6 @@ router.use(requireRole("admin"));
 router.get("/", controller.list);
 router.get("/:id", controller.getOne);
 router.post("/:id/messages", controller.reply);
+router.post("/:id/snapshots", controller.createSnapshot);
 
 module.exports = router;

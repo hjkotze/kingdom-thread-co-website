@@ -52,10 +52,42 @@ function companyReplyEmail(quote, bodyText) {
   };
 }
 
+function formalQuoteReadyEmail(quote, snapshot) {
+  const text = [
+    `Hi,`,
+    ``,
+    `Here's the formal quote for your ${snapshot.product_name} request, locked in based on what we agreed:`,
+    ``,
+    `Size: ${snapshot.size} · Colour: ${snapshot.colour} · Qty: ${snapshot.quantity}`,
+    snapshot.requirements_text ? `Requirements: ${snapshot.requirements_text}` : null,
+    snapshot.font ? `Font: ${snapshot.font}` : null,
+    snapshot.font_colour ? `Font colour: ${snapshot.font_colour}` : null,
+    snapshot.thread_colour_code ? `Thread colour: ${snapshot.thread_colour_code}` : null,
+    snapshot.price !== null && snapshot.price !== undefined ? `Price: R${snapshot.price}` : null,
+    ``,
+    `Log in to your account to review and accept: this is the version we'll go ahead with.`,
+    ``,
+    `Quote #${quote.id}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return { subject: `Re: ${subjectFor(quote)}`, text };
+}
+
+function customerAcceptedNotification(quote) {
+  return {
+    subject: `Quote #${quote.id} accepted by customer`,
+    text: `The customer accepted the formal quote for Quote #${quote.id} (${quote.product_name_snapshot}). Ready to proceed.`,
+  };
+}
+
 module.exports = {
   subjectFor,
   quoteConfirmationEmail,
   newReplyFromCustomerNotification,
   newQuoteNotification,
   companyReplyEmail,
+  formalQuoteReadyEmail,
+  customerAcceptedNotification,
 };

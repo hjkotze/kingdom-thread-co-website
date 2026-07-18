@@ -11,3 +11,7 @@ export function getAdminQuote(id) {
 export function sendAdminReply(id, body) {
   return apiFetch(`/admin/quotes/${id}/messages`, { method: "POST", body: JSON.stringify({ body }) });
 }
+
+export function createSnapshot(id, input) {
+  return apiFetch(`/admin/quotes/${id}/snapshots`, { method: "POST", body: JSON.stringify(input) });
+}

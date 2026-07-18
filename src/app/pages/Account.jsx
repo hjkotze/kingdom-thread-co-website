@@ -86,7 +86,7 @@ export default function Account() {
 
         <div className="flex flex-col gap-3">
           {quotes.map((quote) => {
-            const pending = quote.status === "awaiting_customer";
+            const pending = quote.status === "awaiting_customer" || quote.status === "finalised";
             return (
               <Link
                 key={quote.id}

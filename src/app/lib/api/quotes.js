@@ -11,3 +11,7 @@ export function listQuotes() {
 export function getQuote(id) {
   return apiFetch(`/quotes/${id}`);
 }
+
+export function acceptQuote(id) {
+  return apiFetch(`/quotes/${id}/accept`, { method: "POST" });
+}

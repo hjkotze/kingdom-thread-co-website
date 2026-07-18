@@ -4,6 +4,7 @@ import { ArrowLeft, Download } from "lucide-react";
 import { getAdminQuote, sendAdminReply } from "../lib/api/adminQuotes";
 import { attachmentDownloadUrl } from "../lib/api/attachments";
 import { ApiError } from "../lib/api/client";
+import AdminFormalQuoteSection from "../components/quote/AdminFormalQuoteSection";
 
 const STATUS_LABELS = {
   new: "New",
@@ -54,7 +55,7 @@ export default function AdminQuoteDetail() {
     );
   }
 
-  const { quote, messages, attachments } = data;
+  const { quote, messages, attachments, snapshots } = data;
 
   return (
     <section className="min-h-screen bg-background py-28 px-6">
@@ -114,6 +115,8 @@ export default function AdminQuoteDetail() {
             </ul>
           </div>
         )}
+
+        <AdminFormalQuoteSection quote={quote} snapshots={snapshots} onCreated={load} />
 
         <h2 className="text-sm text-foreground font-medium mb-4">Communication</h2>
         <div className="flex flex-col gap-3 mb-8">
