@@ -5,8 +5,11 @@ const snapshotsService = require("../quoteSnapshots/quoteSnapshots.service");
 
 async function list(req, res, next) {
   try {
-    const quotes = await service.listAllQuotes();
-    res.json({ quotes: quotes.map(service.quoteRowToAdminPublic) });
+    const [quotes, activeQuoteId] = await Promise.all([
+      service.listAllQuotes(),
+      service.getActiveQuoteId(req.session.userId),
+    ]);
+    res.json({ quotes: quotes.map(service.quoteRowToAdminPublic), activeQuoteId });
   } catch (err) {
     next(err);
   }
@@ -16,6 +19,12 @@ async function getOne(req, res, next) {
   try {
     const result = await service.getQuoteWithThread(req.params.id);
     if (!result) return res.status(404).json({ error: "Quote not found" });
+
+    // Opening a quote's detail claims it as this admin's active item (§7) —
+    // superseding whatever was previously active, since only one is
+    // allowed at a time.
+    await service.setActiveQuote(req.session.userId, result.quote.id);
+
     const snapshots = await snapshotsService.getSnapshotsForQuote(result.quote.id);
     res.json({
       quote: service.quoteRowToAdminPublic({

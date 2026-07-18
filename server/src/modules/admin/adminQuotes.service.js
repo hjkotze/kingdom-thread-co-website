@@ -2,6 +2,8 @@ const db = require("../../config/db");
 const mailer = require("../../lib/mailer");
 const emailTemplates = require("../../lib/emailTemplates");
 
+const STALE_THRESHOLD_DAYS = 3;
+
 class AdminQuoteError extends Error {
   constructor(message, statusCode) {
     super(message);
@@ -9,11 +11,44 @@ class AdminQuoteError extends Error {
   }
 }
 
+// Flags are computed on read, not stored (§7) — "needs response" covers a
+// brand-new request with no reply yet or a customer reply awaiting one;
+// "stale" is the same but waiting more than 3 days. last_customer_message_at
+// is populated from quote creation onward, so it works as the reference
+// point for both cases without a separate "first response" timestamp.
+function computeFlags(row) {
+  const needsResponse = row.status === "new" || row.status === "awaiting_company";
+  const referenceTime = row.last_customer_message_at;
+  const daysSinceCustomerMessage = referenceTime
+    ? (Date.now() - new Date(referenceTime).getTime()) / (1000 * 60 * 60 * 24)
+    : null;
+  const isStale = needsResponse && daysSinceCustomerMessage !== null && daysSinceCustomerMessage > STALE_THRESHOLD_DAYS;
+  return { needsResponse, isStale };
+}
+
+// Queue ordering: overdue first, then everything else needing a response
+// (longest-waiting first), then the rest by recency — a working queue, not
+// a chronological log.
+function sortForQueue(rows) {
+  return [...rows].sort((a, b) => {
+    const flagsA = computeFlags(a);
+    const flagsB = computeFlags(b);
+    const tierOf = (flags) => (flags.isStale ? 0 : flags.needsResponse ? 1 : 2);
+    const tierDiff = tierOf(flagsA) - tierOf(flagsB);
+    if (tierDiff !== 0) return tierDiff;
+
+    if (flagsA.needsResponse && flagsB.needsResponse) {
+      return new Date(a.last_customer_message_at) - new Date(b.last_customer_message_at);
+    }
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+}
+
 async function listAllQuotes() {
-  return db("quotes as q")
+  const rows = await db("quotes as q")
     .join("users as u", "u.id", "q.customer_id")
-    .select("q.*", "u.full_name as customer_name", "u.email as customer_email")
-    .orderBy("q.created_at", "desc");
+    .select("q.*", "u.full_name as customer_name", "u.email as customer_email");
+  return sortForQueue(rows);
 }
 
 async function getQuoteWithThread(quoteId) {
@@ -23,6 +58,17 @@ async function getQuoteWithThread(quoteId) {
   const messages = await db("messages").where({ quote_id: quoteId }).orderBy("created_at", "asc");
   const attachments = await db("attachments").where({ quote_id: quoteId }).orderBy("created_at", "desc");
   return { quote, customer, messages, attachments };
+}
+
+async function getActiveQuoteId(adminUserId) {
+  const admin = await db("users").where({ id: adminUserId }).first();
+  return admin?.active_quote_id ?? null;
+}
+
+// "Only one active item at a time" (§7) is enforced by this single column —
+// claiming a new one always supersedes whatever was previously active.
+async function setActiveQuote(adminUserId, quoteId) {
+  await db("users").where({ id: adminUserId }).update({ active_quote_id: quoteId });
 }
 
 // Sends the reply by email, threaded against the most recent message that
@@ -73,6 +119,7 @@ async function sendCompanyReply(adminUserId, quoteId, bodyText) {
 }
 
 function quoteRowToAdminPublic(row) {
+  const { needsResponse, isStale } = computeFlags(row);
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -90,6 +137,8 @@ function quoteRowToAdminPublic(row) {
     fontColour: row.font_colour,
     threadColourCode: row.thread_colour_code,
     status: row.status,
+    needsResponse,
+    isStale,
     lastCustomerMessageAt: row.last_customer_message_at,
     lastCompanyMessageAt: row.last_company_message_at,
     createdAt: row.created_at,
@@ -101,6 +150,8 @@ module.exports = {
   AdminQuoteError,
   listAllQuotes,
   getQuoteWithThread,
+  getActiveQuoteId,
+  setActiveQuote,
   sendCompanyReply,
   quoteRowToAdminPublic,
 };
