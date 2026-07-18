@@ -1,157 +1,6 @@
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
-
-const PRODUCTS = [
-  {
-    id: 1,
-    category: "blanket-budget",
-    name: "Custom Photo Blanket",
-    subtitle: "Budget · Sublimation",
-    price: 45,
-    tag: "Any Design",
-    rating: 4.8,
-    reviews: 124,
-    img: "",
-    imgFallback: "#C4A882",
-    badge: "Most Popular",
-    description:
-      "Full-colour sublimation print. Upload any photo, pattern or artwork.",
-  },
-  {
-    id: 2,
-    category: "blanket-budget",
-    name: "Pattern Throw",
-    subtitle: "Budget · Sublimation",
-    price: 55,
-    tag: "Any Design",
-    rating: 4.7,
-    reviews: 89,
-    img: "",
-    imgFallback: "#B8956A",
-    badge: null,
-    description:
-      "Vivid all-over pattern printing on a soft, lightweight fleece throw.",
-  },
-  {
-    id: 3,
-    category: "blanket-premium",
-    name: "Monogram Blanket",
-    subtitle: "Premium · Embroidered",
-    price: 120,
-    tag: "Minimalist",
-    rating: 5.0,
-    reviews: 42,
-    img: "",
-    imgFallback: "#D4C4A8",
-    badge: "Handcrafted",
-    description:
-      "Precision thread embroidery of your initials or a simple monogram on a luxury wool-blend.",
-  },
-  {
-    id: 4,
-    category: "blanket-premium",
-    name: "Minimalist Line Art",
-    subtitle: "Premium · Embroidered",
-    price: 140,
-    tag: "Minimalist",
-    rating: 4.9,
-    reviews: 31,
-    img: "",
-    imgFallback: "#C8B89A",
-    badge: null,
-    description:
-      "Single-colour line illustration embroidered cleanly on a neutral ground. Timeless.",
-  },
-  {
-    id: 5,
-    category: "socks",
-    name: "Custom Ankle Socks",
-    subtitle: "Socks · Sublimation",
-    price: 18,
-    tag: "Any Design",
-    rating: 4.8,
-    reviews: 211,
-    img: "",
-    imgFallback: "#9A7B5C",
-    badge: "Best Seller",
-    description:
-      "Full-wrap sublimation on premium cotton-blend. Your design, exactly.",
-  },
-  {
-    id: 6,
-    category: "socks",
-    name: "Custom Crew Socks",
-    subtitle: "Socks · Sublimation",
-    price: 22,
-    tag: "Any Design",
-    rating: 4.9,
-    reviews: 178,
-    img: "",
-    imgFallback: "#8A6B4E",
-    badge: null,
-    description:
-      "Crew-length with edge-to-edge print. Ideal for gifting, teams, or personal expression.",
-  },
-  {
-    id: 7,
-    category: "pillow-budget",
-    name: "Custom Pillow Case",
-    subtitle: "Budget · Sublimation",
-    price: 25,
-    tag: "Any Design",
-    rating: 4.7,
-    reviews: 66,
-    img: "",
-    imgFallback: "#BFA882",
-    badge: null,
-    description:
-      "Sublimation-printed pillow case with vibrant, wash-resistant colour on a smooth polyester cover.",
-  },
-  {
-    id: 8,
-    category: "pillow-premium",
-    name: "Embroidered Pillow Case",
-    subtitle: "Premium · Embroidered",
-    price: 85,
-    tag: "Minimalist",
-    rating: 4.9,
-    reviews: 19,
-    img: "",
-    imgFallback: "#D8CCBA",
-    badge: "Handcrafted",
-    description:
-      "Crisp cotton pillow case with a hand-embroidered monogram or minimal motif. A quiet luxury.",
-  },
-  {
-    id: 9,
-    category: "duvet-budget",
-    name: "Custom Duvet Cover",
-    subtitle: "Budget · Sublimation",
-    price: 180,
-    tag: "Any Design",
-    rating: 4.6,
-    reviews: 38,
-    img: "",
-    imgFallback: "#C4A86E",
-    badge: "New",
-    description:
-      "Full-surface sublimation on a soft microfibre duvet cover. Make your bedroom entirely your own.",
-  },
-  {
-    id: 10,
-    category: "duvet-premium",
-    name: "Embroidered Duvet Cover",
-    subtitle: "Premium · Embroidered",
-    price: 350,
-    tag: "Minimalist",
-    rating: 5.0,
-    reviews: 9,
-    img: "",
-    imgFallback: "#E0D4BC",
-    badge: "Luxury",
-    description:
-      "100% cotton duvet cover with a single refined embroidered motif. Understated, enduring quality.",
-  },
-];
+import { fetchProducts } from "../lib/api/products";
 
 const FILTER_OPTIONS = [
   { value: "all", label: "All Products" },
@@ -169,10 +18,30 @@ export default function Shop({
   setActiveFilter,
   onOrderNow,
 }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProducts()
+      .then((data) => {
+        if (!cancelled) setProducts(data.products);
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredProducts =
     activeFilter === "all"
-      ? PRODUCTS
-      : PRODUCTS.filter((p) => p.category === activeFilter);
+      ? products
+      : products.filter((p) => p.category === activeFilter);
 
   return (
     <section id="shop" className="py-28 bg-card">
@@ -224,6 +93,15 @@ export default function Shop({
           </div>
         </div>
 
+        {loading && (
+          <p className="text-sm text-muted-foreground">Loading products…</p>
+        )}
+        {!loading && filteredProducts.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No products found.
+          </p>
+        )}
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredProducts.map((product) => (
             <div
@@ -233,11 +111,11 @@ export default function Shop({
             >
               <div
                 className="relative h-56 overflow-hidden"
-                style={{ background: product.imgFallback }}
+                style={{ background: product.imageFallbackColour }}
               >
-                {product.img && (
+                {product.imageUrl && (
                   <img
-                    src={product.img}
+                    src={product.imageUrl}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />

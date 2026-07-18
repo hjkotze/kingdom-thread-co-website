@@ -28,4 +28,9 @@ module.exports = {
   sessionSecret: process.env.NODE_ENV === "production"
     ? required("SESSION_SECRET")
     : process.env.SESSION_SECRET || "dev-only-insecure-secret",
+
+  airtable: {
+    apiKey: process.env.AIRTABLE_API_KEY || "",
+    baseId: process.env.AIRTABLE_BASE_ID || "",
+  },
 };

@@ -1,61 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown } from "lucide-react";
-
-const CATEGORIES = [
-  {
-    id: "blanket-budget",
-    label: "Budget Blankets",
-    headline: "Any design. Any photo. Yours.",
-    body: "Sublimation printing lets you put literally anything on your blanket — family portraits, pet photos, custom illustrations, gradients, full-colour patterns. No design restrictions, incredibly vibrant results.",
-    callout: "From R45 · Any Design",
-    img: "",
-    alt: "Colourful custom sublimation blanket draped over a couch",
-  },
-  {
-    id: "blanket-premium",
-    label: "Premium Blankets",
-    headline: "Restraint, elevated to an art.",
-    body: "Our premium blankets are hand-embroidered with a single motif — a monogram, a minimal line illustration, a small crest. Nothing more. The luxury is in the material and the precision of the stitch.",
-    callout: "From R120 · Minimalist Only",
-    img: "",
-    alt: "Cream wool blanket with delicate monogram embroidery",
-  },
-  {
-    id: "home-budget",
-    label: "Budget Home Textiles",
-    headline: "Your bedroom, your canvas.",
-    body: "Sublimation-printed pillow cases and duvet covers let you bring any photo or pattern to your living space. Full-colour, wash-resistant, and made to last. Great for personal use and gifting.",
-    callout: "Pillows from R25 · Duvets from R180",
-    img: "",
-    alt: "Colourful custom printed duvet cover on a bed",
-  },
-  {
-    id: "home-premium",
-    label: "Premium Home Textiles",
-    headline: "The quiet beauty of a single stitch.",
-    body: "Embroidered pillow cases and duvet covers in quality cotton. One motif, precisely placed. For those who believe that restraint is the ultimate luxury.",
-    callout: "Pillows from R85 · Duvets from R350",
-    img: "",
-    alt: "Minimal cream duvet with embroidered accent",
-  },
-  {
-    id: "socks",
-    label: "Custom Socks",
-    headline: "Your artwork, wrapped around every step.",
-    body: "Sublimation socks with edge-to-edge colour fidelity. Submit any design — patterns, portraits, logos, memes — and we print it faithfully onto a comfortable cotton-blend base.",
-    callout: "From R18 · Any Design",
-    img: "",
-    alt: "Brightly patterned custom sublimation socks on a wooden surface",
-  },
-];
+import { fetchCategories } from "../lib/api/products";
 
 export default function ProductCategories({
   setActiveFilter,
   scrollTo,
 }) {
+  const [categories, setCategories] = useState([]);
   const [expandedCategory, setExpandedCategory] = useState(
     "blanket-budget",
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCategories()
+      .then((data) => {
+        if (!cancelled) setCategories(data.categories);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section id="products" className="py-28 bg-card">
@@ -88,9 +56,9 @@ export default function ProductCategories({
         </div>
 
         <div className="flex flex-col gap-1">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <div
-              key={cat.id}
+              key={cat.slug}
               className="border border-border overflow-hidden"
               style={{ borderRadius: "var(--radius)" }}
             >
@@ -98,9 +66,9 @@ export default function ProductCategories({
                 className="w-full text-left px-8 py-6 flex items-center justify-between bg-background hover:bg-secondary transition-colors"
                 onClick={() =>
                   setExpandedCategory(
-                    expandedCategory === cat.id
+                    expandedCategory === cat.slug
                       ? null
-                      : cat.id,
+                      : cat.slug,
                   )
                 }
               >
@@ -127,14 +95,14 @@ export default function ProductCategories({
                   className="text-muted-foreground transition-transform duration-300"
                   style={{
                     transform:
-                      expandedCategory === cat.id
+                      expandedCategory === cat.slug
                         ? "rotate(180deg)"
                         : "rotate(0deg)",
                   }}
                 />
               </button>
 
-              {expandedCategory === cat.id && (
+              {expandedCategory === cat.slug && (
                 <div className="grid md:grid-cols-2 gap-0 bg-card">
                   <div className="px-8 py-10 flex flex-col justify-center">
                     <h4
@@ -153,11 +121,11 @@ export default function ProductCategories({
                     <button
                       onClick={() => {
                         setActiveFilter(
-                          cat.id.replace(
+                          cat.slug.replace(
                             "home-",
                             "pillow-",
-                          ) === cat.id
-                            ? cat.id
+                          ) === cat.slug
+                            ? cat.slug
                             : "all",
                         );
                         scrollTo("#shop");
@@ -168,11 +136,13 @@ export default function ProductCategories({
                     </button>
                   </div>
                   <div className="h-64 md:h-auto bg-muted overflow-hidden">
-                    <img
-                      src={cat.img}
-                      alt={cat.alt}
-                      className="w-full h-full object-cover"
-                    />
+                    {cat.imageUrl && (
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.alt}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                   </div>
                 </div>
               )}
