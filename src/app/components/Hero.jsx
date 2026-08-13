@@ -29,7 +29,7 @@ export default function Hero({ scrollTo }) {
   ];
 
   return (
-    <section id="hero" className="sticky top-0 z-10 pt-28 min-h-screen flex items-center overflow-hidden bg-background">
+    <section id="hero" className="pt-28 flex items-center overflow-hidden bg-background">
       <div className="absolute inset-0 bg-muted">
         <img
           src=""

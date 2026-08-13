@@ -36,18 +36,15 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Scrollspy for the stacked homepage sections (see HomePage.jsx's
-  // StackedSection wrappers and scrollToSection.js's staticTopOf) — each
-  // tracked section's true static document offset is computed the same way
-  // used for nav-click jumps, since sticky elements' own live geometry
-  // (getBoundingClientRect/offsetTop) reports their current pinned
-  // position, not their place in normal flow, while they're mid-dwell.
-  // Comparing scrollY against those fixed offsets finds the last section
-  // we've reached. Recomputed on every scroll tick rather than cached,
-  // because ProductCategories/Shop fetch their content asynchronously —
-  // a cache built once on mount (before those fetches resolve) would go
-  // stale as soon as the real content changes each section's height.
-  // No-ops on every other route since none of these ids exist there.
+  // Scrollspy for the homepage sections — each tracked section's document
+  // offset is computed the same way used for nav-click jumps (see
+  // scrollToSection.js's staticTopOf), and comparing scrollY against those
+  // offsets finds the last section we've reached. Recomputed on every
+  // scroll tick rather than cached, because ProductCategories/Shop fetch
+  // their content asynchronously — a cache built once on mount (before
+  // those fetches resolve) would go stale as soon as the real content
+  // changes each section's height. No-ops on every other route since none
+  // of these ids exist there.
   useEffect(() => {
     if (location.pathname !== "/") {
       setActiveSection(null);

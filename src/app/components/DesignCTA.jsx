@@ -13,7 +13,7 @@ const SHOWCASE_IMAGES = [
 
 export default function DesignCTA({ scrollTo }) {
   return (
-    <section className="relative z-[45] py-28 bg-foreground text-primary-foreground overflow-hidden">
+    <section className="py-28 bg-foreground text-primary-foreground overflow-hidden">
       <div className="absolute inset-0 opacity-5">
         <img
           src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&h=800&fit=crop&auto=format"

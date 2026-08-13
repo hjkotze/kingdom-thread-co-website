@@ -28,7 +28,7 @@ export default function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="sticky top-0 z-30 py-28 min-h-screen bg-background"
+      className="py-28 bg-background"
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-16">

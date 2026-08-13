@@ -26,7 +26,7 @@ export default function ProductCategories({
   }, []);
 
   return (
-    <section id="products" className="sticky top-0 z-20 py-28 min-h-screen bg-secondary">
+    <section id="products" className="py-28 bg-secondary">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>

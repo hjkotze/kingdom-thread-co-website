@@ -45,7 +45,7 @@ export default function Shop({
       : products.filter((p) => p.categoryId === activeFilter);
 
   return (
-    <section id="shop" className="sticky top-0 z-40 py-28 min-h-screen bg-secondary">
+    <section id="shop" className="py-28 bg-secondary">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
