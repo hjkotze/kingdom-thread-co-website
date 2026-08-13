@@ -20,19 +20,40 @@ import { scrollToSection } from "../lib/scrollToSection";
 // content the previous section was still actively revealing (confirmed by
 // measurement, not just theory: the overlap window is defined to end
 // exactly where that section's content finishes, so it always lands on the
-// tail of the reveal, never purely on "dead" space after it). For Hero/
-// Products/HowItWorks that's invisible because each has at most ~150px of
-// content taller than one viewport, so the eaten sliver is negligible. Shop
-// is different — with a full product grid its content can run to ~2
-// viewports, so the same 1-viewport overlap swallowed entire rows of
-// products behind DesignCTA. Hence the much smaller DESIGN_CTA_OVERLAP_CLASS
-// below, used only for the Shop → DesignCTA handoff.
+// tail of the reveal, never purely on "dead" space after it). For Hero and
+// HowItWorks that's invisible because each has fixed, short content well
+// under one viewport, so the eaten sliver is negligible. Products and Shop
+// are different — an expanded category accordion (Products) or a full
+// product grid (Shop) can push their content well past one viewport, so the
+// same 1-viewport overlap swallows whatever hasn't been revealed yet (e.g.
+// the last category's expanded panel getting cut off before you can scroll
+// to it).
 const STACK_OVERLAP_CLASS = "-mt-[100vh]";
 
-// Same purpose as STACK_OVERLAP_CLASS (avoid a blank gap after Shop's own
-// content finishes) but deliberately tiny, so it can only ever eat a few
-// stray pixels instead of a whole viewport of not-yet-seen products.
-const DESIGN_CTA_OVERLAP_CLASS = "-mt-[24px]";
+// Deliberately tiny, so it can only ever eat a few stray pixels instead of a
+// whole viewport of not-yet-seen content. Used for the Shop → DesignCTA
+// handoff, where Shop's product grid can run to ~2 viewports — nowhere near
+// small enough a safety margin to afford a bigger overlap (see
+// PRODUCTS_TO_HOW_OVERLAP_CLASS below for a case where a bigger one *is*
+// affordable).
+const SMALL_OVERLAP_CLASS = "-mt-[24px]";
+const DESIGN_CTA_OVERLAP_CLASS = SMALL_OVERLAP_CLASS;
+
+// Products → HowItWorks handoff. Unlike Shop's grid, an expanded category
+// accordion only ever grows ~150-180px past one viewport (measured directly
+// via occlusion testing: scrolling through with elementFromPoint checks,
+// not just geometry, since a higher z-index sibling can geometrically
+// overlap a target while actually painting over it). That leaves enough
+// safety margin to afford a much bigger overlap than SMALL_OVERLAP_CLASS —
+// -130px tested clean through the tallest/last category ("Custom Socks")
+// with room to spare, giving a noticeably stronger "cover" feel than a flat
+// -24px everywhere would (a single small overlap across every transition
+// was tried once and made the fixed-height handoffs, which don't need any
+// safety margin, lose the cover feel entirely). Below `md`, ProductCategories'
+// grid (`md:grid-cols-2`) stacks the category image under its text instead
+// of beside it, making expanded panels much taller — so mobile keeps the
+// same tiny, universally-safe overlap as Shop → DesignCTA instead.
+const PRODUCTS_TO_HOW_OVERLAP_CLASS = "-mt-[24px] md:-mt-[130px]";
 
 // Wraps a stacked section together with a same-height-as-viewport spacer
 // sibling. The spacer is what actually gives `sticky top-0` room to dwell
@@ -44,9 +65,15 @@ const DESIGN_CTA_OVERLAP_CLASS = "-mt-[24px]";
 // scrolling normally through the rest of its own height — which in turn
 // guarantees a section's full content (however tall, e.g. a large product
 // grid) always gets scrolled past before the next section can take over.
+//
+// overlap: false (no pull-up), true (full -100vh cover effect), or a
+// className string for a custom overlap (see the *_OVERLAP_CLASS constants
+// above for the cases that need one).
 function StackedSection({ overlap = false, children }) {
+  const overlapClass =
+    typeof overlap === "string" ? overlap : overlap ? STACK_OVERLAP_CLASS : "";
   return (
-    <div className={`relative${overlap ? ` ${STACK_OVERLAP_CLASS}` : ""}`}>
+    <div className={`relative${overlapClass ? ` ${overlapClass}` : ""}`}>
       {children}
       <div className="h-screen" aria-hidden="true" />
     </div>
@@ -85,7 +112,7 @@ export default function HomePage() {
         <ProductCategories setActiveFilter={setActiveFilter} scrollTo={scrollTo} />
       </StackedSection>
 
-      <StackedSection overlap>
+      <StackedSection overlap={PRODUCTS_TO_HOW_OVERLAP_CLASS}>
         <HowItWorks />
       </StackedSection>
 
