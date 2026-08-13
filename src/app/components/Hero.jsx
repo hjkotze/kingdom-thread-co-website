@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { fetchHomeStats } from "../lib/api/homeStats";
+import { fetchHeroImages } from "../lib/api/heroImages";
+
+// Matches the two-box layout below (a larger box, then a smaller offset
+// one) — the NocoDB table itself allows any number of rows (§ hero images),
+// but this layout only has room for two, so extras beyond this are ignored.
+const IMAGE_BOX_CLASSES = [
+  "w-72 h-80",
+  "w-56 h-56 self-start",
+];
 
 export default function Hero({ scrollTo }) {
   const [stats, setStats] = useState(null);
+  const [heroImages, setHeroImages] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -13,6 +23,21 @@ export default function Hero({ scrollTo }) {
       .catch(() => {
         // leave stats null on failure — same "—" placeholder as loading,
         // rather than fabricating a number when the real one is unknown.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHeroImages()
+      .then((data) => {
+        if (!cancelled) setHeroImages(data.heroImages || []);
+      })
+      .catch(() => {
+        // leave heroImages empty on failure — the image column is simply
+        // hidden rather than showing broken images (§ below).
       });
     return () => {
       cancelled = true;
@@ -102,28 +127,23 @@ export default function Hero({ scrollTo }) {
           </div>
         </div>
 
-        <div className="hidden lg:flex flex-col gap-4 items-end">
-          <div
-            className="w-72 h-80 overflow-hidden bg-muted"
-            style={{ borderRadius: "var(--radius)" }}
-          >
-            <img
-              src="https://images.unsplash.com/photo-1580301762395-13a9f7a84e59?w=600&h=700&fit=crop&auto=format"
-              alt="Colourful custom blanket"
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
-            />
+        {heroImages.length > 0 && (
+          <div className="hidden lg:flex flex-col gap-4 items-end">
+            {heroImages.slice(0, 2).map((img, i) => (
+              <div
+                key={img.id}
+                className={`${IMAGE_BOX_CLASSES[i]} overflow-hidden bg-muted`}
+                style={{ borderRadius: "var(--radius)" }}
+              >
+                <img
+                  src={img.imageUrl}
+                  alt={img.alt}
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+                />
+              </div>
+            ))}
           </div>
-          <div
-            className="w-56 h-56 overflow-hidden bg-muted self-start"
-            style={{ borderRadius: "var(--radius)" }}
-          >
-            <img
-              src="https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=500&h=500&fit=crop&auto=format"
-              alt="Custom patterned socks"
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
-            />
-          </div>
-        </div>
+        )}
       </div>
     </section>
   );

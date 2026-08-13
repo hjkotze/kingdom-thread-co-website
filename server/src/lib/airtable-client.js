@@ -73,6 +73,7 @@ const TABLE_IDS = {
   Products: "muf73xtpol8t9gh",
   Categories: "m0g6irpyv8dpemw",
   "Thread Colours": "md49w3daqw9r9jc",
+  "Hero Images": "m3l67mxgj6my4e9",
 };
 
 // Link (relation) fields, keyed by table -> field name. NocoDB v3 represents
@@ -92,6 +93,7 @@ const LINK_FIELDS = {
 const ATTACHMENT_FIELD_IDS = {
   Products: { Image: "ckh45ybn0e97xzp" },
   Categories: { Image: "c204dljxf6e3pdv" },
+  "Hero Images": { Image: "cvi0mayehoquqso" },
 };
 
 // MultiSelect field IDs, also resolved via GET /api/v2/meta/tables/{tableId}
