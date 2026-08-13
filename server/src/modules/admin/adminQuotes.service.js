@@ -47,7 +47,28 @@ function sortForQueue(rows) {
 async function listAllQuotes() {
   const rows = await db("quotes as q")
     .join("users as u", "u.id", "q.customer_id")
-    .select("q.*", "u.full_name as customer_name", "u.email as customer_email");
+    .leftJoin("products_cache as pc", "pc.airtable_id", "q.product_airtable_id")
+    .leftJoin("categories_cache as cc", "cc.airtable_id", "pc.category_airtable_id")
+    .select(
+      "q.*",
+      "u.full_name as customer_name",
+      "u.email as customer_email",
+      "cc.slug as category_slug",
+      "cc.label as category_label"
+    );
+
+  // Latest snapshot's quote_number per quote, merged in JS rather than a
+  // correlated subquery — simplest way to get a "last one wins" value per
+  // group without complicating the query above.
+  const snapshots = await db("quote_snapshots").select("quote_id", "quote_number").orderBy("id", "desc");
+  const quoteNumberByQuoteId = new Map();
+  for (const s of snapshots) {
+    if (!quoteNumberByQuoteId.has(s.quote_id)) quoteNumberByQuoteId.set(s.quote_id, s.quote_number);
+  }
+  rows.forEach((row) => {
+    row.quote_number = quoteNumberByQuoteId.get(row.id) || null;
+  });
+
   return sortForQueue(rows);
 }
 
@@ -122,6 +143,7 @@ function quoteRowToAdminPublic(row) {
   const { needsResponse, isStale } = computeFlags(row);
   return {
     id: row.id,
+    quoteNumber: row.quote_number || null,
     customerId: row.customer_id,
     customerName: row.customer_name,
     customerEmail: row.customer_email,
@@ -137,6 +159,9 @@ function quoteRowToAdminPublic(row) {
     fontColour: row.font_colour,
     threadColourCode: row.thread_colour_code,
     status: row.status,
+    orderId: row.order_id || null,
+    categorySlug: row.category_slug || null,
+    categoryLabel: row.category_label || null,
     needsResponse,
     isStale,
     lastCustomerMessageAt: row.last_customer_message_at,

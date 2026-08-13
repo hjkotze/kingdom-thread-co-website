@@ -3,10 +3,11 @@ import { useNavigate, useParams } from "react-router";
 import { apiFetch } from "../lib/api/client";
 import { fetchThreadColours } from "../lib/api/threadColours";
 import { useQuoteDraft } from "../lib/quote/QuoteDraftContext";
-import { FONTS } from "../lib/fonts";
 import AuthCard from "../components/auth/AuthCard";
-import FormSelect from "../components/quote/FormSelect";
+import FontSelect from "../components/quote/FontSelect";
+import ThreadColourSelect from "../components/quote/ThreadColourSelect";
 import FileDropzone from "../components/quote/FileDropzone";
+import Header from "../components/Header";
 
 const COMMON_FONT_COLOURS = [
   { name: "Black", hex: "#000000" },
@@ -62,20 +63,29 @@ export default function ProductQuoteCustomise() {
 
   const matchingPreset = COMMON_FONT_COLOURS.find((c) => c.hex.toLowerCase() === fontColour.toLowerCase());
 
+  const isEmbroidered = product?.printingMethod === "Embroidered";
+
   const handleContinue = (e) => {
     e.preventDefault();
     if (!requirements.trim()) return setError("Please describe your requirements.");
     if (!font) return setError("Please choose a font.");
-    if (!threadColourCode) return setError("Please choose a thread colour.");
+    if (isEmbroidered && !threadColourCode) return setError("Please choose a thread colour.");
 
-    updateDraft({ requirements: requirements.trim(), font, fontColour, threadColourCode });
+    updateDraft({
+      requirements: requirements.trim(),
+      font,
+      fontColour: isEmbroidered ? null : fontColour,
+      threadColourCode: isEmbroidered ? threadColourCode : null,
+    });
     navigate("/quote/review");
   };
 
   if (loading || !product) return null;
 
   return (
-    <AuthCard
+    <>
+      <Header />
+      <AuthCard
       eyebrow="Step 2 of 2"
       title="Your design"
       subtitle={`Tell us what you'd like on your ${product.name.toLowerCase()}.`}
@@ -110,65 +120,41 @@ export default function ProductQuoteCustomise() {
           onSelect={(file) => setDraftFile("text", file)}
         />
 
-        <FormSelect label="Font" value={font} onChange={(e) => setFont(e.target.value)} options={FONTS} />
+        <FontSelect value={font} onValueChange={setFont} />
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-foreground font-medium">Font colour</label>
-          <div className="flex gap-3 items-center">
-            <select
-              value={matchingPreset ? matchingPreset.hex : ""}
-              onChange={(e) => setFontColour(e.target.value)}
-              className="flex-1 bg-input-background border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              style={{ borderRadius: "var(--radius)" }}
-            >
-              <option value="">Custom…</option>
-              {COMMON_FONT_COLOURS.map((c) => (
-                <option key={c.hex} value={c.hex}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="color"
-              value={fontColour}
-              onChange={(e) => setFontColour(e.target.value)}
-              className="w-11 h-11 border border-border cursor-pointer"
-              style={{ borderRadius: "var(--radius)" }}
-              aria-label="Custom font colour"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-foreground font-medium">Thread colour</label>
-          <select
-            value={threadColourCode}
-            onChange={(e) => setThreadColourCode(e.target.value)}
-            className="bg-input-background border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            style={{ borderRadius: "var(--radius)" }}
-          >
-            <option value="">Select a thread colour…</option>
-            {threadColours.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code} — {c.name}
-              </option>
-            ))}
-          </select>
-          {threadColourCode && (
-            <div className="flex items-center gap-2 mt-1">
-              <span
-                className="w-4 h-4 border border-border"
-                style={{
-                  borderRadius: "var(--radius)",
-                  background: threadColours.find((c) => c.code === threadColourCode)?.hex,
-                }}
+        {/* Exactly one of these two applies, never both — an embroidered
+            product's visible colour *is* whatever thread is chosen; a
+            sublimation-printed product has no physical thread at all. */}
+        {isEmbroidered ? (
+          <ThreadColourSelect value={threadColourCode} onValueChange={setThreadColourCode} threadColours={threadColours} />
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm text-foreground font-medium">Font colour</label>
+            <div className="flex gap-3 items-center">
+              <select
+                value={matchingPreset ? matchingPreset.hex : ""}
+                onChange={(e) => setFontColour(e.target.value)}
+                className="flex-1 bg-input-background border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                style={{ borderRadius: "var(--radius)" }}
+              >
+                <option value="">Custom…</option>
+                {COMMON_FONT_COLOURS.map((c) => (
+                  <option key={c.hex} value={c.hex}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="color"
+                value={fontColour}
+                onChange={(e) => setFontColour(e.target.value)}
+                className="w-11 h-11 border border-border cursor-pointer"
+                style={{ borderRadius: "var(--radius)" }}
+                aria-label="Custom font colour"
               />
-              <span className="text-xs text-muted-foreground">
-                {threadColours.find((c) => c.code === threadColourCode)?.pantone}
-              </span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <button
           type="submit"
@@ -178,6 +164,7 @@ export default function ProductQuoteCustomise() {
           Continue
         </button>
       </form>
-    </AuthCard>
+      </AuthCard>
+    </>
   );
 }

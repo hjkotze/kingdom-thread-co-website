@@ -58,16 +58,27 @@ async function validateAndBuildQuoteInput(input) {
     if (!font || !FONTS.includes(font)) {
       throw new ValidationError("Invalid font selection.");
     }
-    if (!fontColour || !HEX_COLOUR_RE.test(fontColour)) {
-      throw new ValidationError("Invalid font colour.");
+
+    // Embroidered products: the visible text colour *is* the thread
+    // colour — no independent font colour. Sublimation (or an unset
+    // printing method, as a safe default): no physical thread, so font
+    // colour is the only one that applies. Exactly one of the two is ever
+    // asked for/stored, never both — matches every display component
+    // already rendering each field conditionally on it being non-null.
+    if (product.printingMethod === "Embroidered") {
+      if (!threadColourCode || !(await threadColoursService.isValidThreadColourCode(threadColourCode))) {
+        throw new ValidationError("Invalid thread colour selection.");
+      }
+      result.threadColourCode = threadColourCode;
+    } else {
+      if (!fontColour || !HEX_COLOUR_RE.test(fontColour)) {
+        throw new ValidationError("Invalid font colour.");
+      }
+      result.fontColour = fontColour;
     }
-    if (!threadColourCode || !(await threadColoursService.isValidThreadColourCode(threadColourCode))) {
-      throw new ValidationError("Invalid thread colour selection.");
-    }
+
     result.requirementsText = requirements.trim();
     result.font = font;
-    result.fontColour = fontColour;
-    result.threadColourCode = threadColourCode;
   }
 
   return result;
@@ -142,6 +153,59 @@ async function getQuoteForCustomer(customerId, quoteId) {
   return { quote, messages };
 }
 
+// Mirrors adminQuotes.service.js's sendCompanyReply, reversed — a customer
+// typing a reply in-app is emailed to the company's monitored mailbox
+// (threaded via In-Reply-To/References against the same anchor message),
+// so the mailbox stays the single source of truth for the whole
+// conversation regardless of which side is replying from the app vs a
+// real email client. Not wrapped in a try/catch around the send: the
+// entire point of this action is notifying the company, so a failed send
+// should fail the request rather than silently recording an unsent reply
+// (same reasoning as sendCompanyReply).
+async function sendCustomerReply(customerId, quoteId, bodyText) {
+  if (!bodyText || !bodyText.trim()) throw new ValidationError("Reply body is required.");
+
+  const quote = await db("quotes").where({ id: quoteId, customer_id: customerId }).first();
+  if (!quote) return null;
+
+  const anchor = await db("messages")
+    .where({ quote_id: quoteId })
+    .whereNotNull("email_message_id")
+    .orderBy("created_at", "desc")
+    .first();
+
+  const newMessageId = mailer.generateMessageId(quote.id);
+  const { subject, text } = emailTemplates.customerReplyEmail(quote, bodyText.trim());
+
+  await mailer.sendMail({
+    to: env.companyNotificationEmail,
+    subject,
+    text,
+    messageId: newMessageId,
+    inReplyTo: anchor?.email_message_id,
+    references: anchor?.email_message_id,
+  });
+
+  const now = new Date();
+  const [messageRowId] = await db("messages").insert({
+    quote_id: quoteId,
+    sender_type: "customer",
+    sender_user_id: customerId,
+    direction: "outbound",
+    body_text: bodyText.trim(),
+    email_message_id: newMessageId,
+    in_reply_to: anchor?.email_message_id || null,
+  });
+
+  await db("quotes").where({ id: quoteId }).update({
+    status: "awaiting_company",
+    last_customer_message_at: now,
+    updated_at: now,
+  });
+
+  return db("messages").where({ id: messageRowId }).first();
+}
+
 function quoteRowToPublic(row) {
   return {
     id: row.id,
@@ -157,6 +221,7 @@ function quoteRowToPublic(row) {
     fontColour: row.font_colour,
     threadColourCode: row.thread_colour_code,
     status: row.status,
+    orderId: row.order_id || null,
     lastCustomerMessageAt: row.last_customer_message_at,
     lastCompanyMessageAt: row.last_company_message_at,
     createdAt: row.created_at,
@@ -179,6 +244,7 @@ module.exports = {
   createQuote,
   listQuotesForCustomer,
   getQuoteForCustomer,
+  sendCustomerReply,
   quoteRowToPublic,
   messageRowToPublic,
 };

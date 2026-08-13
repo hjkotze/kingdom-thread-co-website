@@ -5,6 +5,7 @@ import { createQuote } from "../lib/api/quotes";
 import { uploadAttachment } from "../lib/api/attachments";
 import { useQuoteDraft } from "../lib/quote/QuoteDraftContext";
 import AuthCard from "../components/auth/AuthCard";
+import Header from "../components/Header";
 
 export default function QuoteReview() {
   const navigate = useNavigate();
@@ -51,15 +52,25 @@ export default function QuoteReview() {
       // Best-effort: the quote request itself already succeeded above, so a
       // failed upload here shouldn't block the customer from reaching their
       // confirmation — they can retry the upload from the quote detail page.
+      // It used to fail *silently* though (console.error only) — the
+      // customer would land on the confirmation with no idea their design
+      // file never made it, then discover it only if they happened to check
+      // back later. Now the failure is passed along so the quote detail
+      // page can put a clear "please re-attach" notice right at the upload
+      // section instead.
+      const failedUploads = [];
       if (files.image) {
-        await uploadAttachment(quote.id, "image", files.image).catch((err) => console.error(err));
+        await uploadAttachment(quote.id, "image", files.image).catch(() => failedUploads.push("design image"));
       }
       if (files.text) {
-        await uploadAttachment(quote.id, "text", files.text).catch((err) => console.error(err));
+        await uploadAttachment(quote.id, "text", files.text).catch(() => failedUploads.push("design brief"));
       }
 
       clearDraft();
-      navigate(`/account/quotes/${quote.id}`, { replace: true });
+      navigate(`/account/quotes/${quote.id}`, {
+        replace: true,
+        state: failedUploads.length > 0 ? { failedUploads } : undefined,
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
       setSubmitting(false);
@@ -69,7 +80,9 @@ export default function QuoteReview() {
   if (loading || !product || !draft) return null;
 
   return (
-    <AuthCard eyebrow="Final step" title="Review your request" error={error}>
+    <>
+      <Header />
+      <AuthCard eyebrow="Final step" title="Review your request" error={error}>
       <dl className="flex flex-col gap-4 text-sm">
         <Row label="Product" value={product.name} />
         <Row label="Size" value={draft.size} />
@@ -107,7 +120,8 @@ export default function QuoteReview() {
       <p className="text-xs text-muted-foreground text-center mt-3">
         No payment is taken until you approve your design proof.
       </p>
-    </AuthCard>
+      </AuthCard>
+    </>
   );
 }
 

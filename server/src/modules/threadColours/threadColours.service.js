@@ -1,5 +1,16 @@
 const db = require("../../config/db");
-const { listAllRecords } = require("../../lib/airtable-client");
+const { listAllRecords, createRecord, updateRecord, deleteRecord } = require("../../lib/airtable-client");
+
+const TABLE = "Thread Colours";
+
+class ThreadColourError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
 function mapRecord(record) {
   const f = record.fields;
@@ -23,7 +34,7 @@ function rowToPublic(row) {
 }
 
 async function fetchLive() {
-  const records = await listAllRecords("Thread Colours", { sort: [{ field: "Code" }] });
+  const records = await listAllRecords(TABLE, { sort: [{ field: "Code" }] });
   return records.map(mapRecord);
 }
 
@@ -70,4 +81,69 @@ async function isValidThreadColourCode(code) {
   return colours.some((c) => c.code === code);
 }
 
-module.exports = { getThreadColours, isValidThreadColourCode };
+// Admin surfaces always read live (never cache-fallback), same reasoning
+// as products/categories admin reads — an admin editing this list needs
+// real state, not a stale snapshot.
+async function listThreadColoursForAdmin() {
+  const colours = await fetchLive();
+  return colours.map((c) => ({ id: c.airtableId, code: c.code, name: c.name, pantone: c.pantone, hex: c.hex }));
+}
+
+async function getThreadColourByIdForAdmin(id) {
+  const colours = await listThreadColoursForAdmin();
+  return colours.find((c) => c.id === id) || null;
+}
+
+function validateThreadColourInput({ code, name, hex }) {
+  if (!code || !code.trim()) throw new ThreadColourError("Code is required.", 400);
+  if (!name || !name.trim()) throw new ThreadColourError("Name is required.", 400);
+  if (hex && !HEX_RE.test(hex)) throw new ThreadColourError("Hex must look like #RRGGBB.", 400);
+}
+
+function buildFields({ code, name, pantone, hex }) {
+  return {
+    Code: code.trim(),
+    Name: name.trim(),
+    Pantone: pantone || "",
+    Hex: hex || "",
+  };
+}
+
+function toPublic(mapped) {
+  return { id: mapped.airtableId, code: mapped.code, name: mapped.name, pantone: mapped.pantone, hex: mapped.hex };
+}
+
+async function createThreadColour(input) {
+  validateThreadColourInput(input);
+  const record = await createRecord(TABLE, buildFields(input));
+  return toPublic(mapRecord(record));
+}
+
+async function updateThreadColour(id, input) {
+  validateThreadColourInput(input);
+  const existing = await getThreadColourByIdForAdmin(id);
+  if (!existing) throw new ThreadColourError("Thread colour not found", 404);
+  const record = await updateRecord(TABLE, id, buildFields(input));
+  return toPublic(mapRecord(record));
+}
+
+// No referential-integrity concern — thread_colour_code is stored as a
+// plain string snapshot on quotes/snapshots (quotes.service.js,
+// quoteSnapshots.service.js), never a live foreign key, so deleting a
+// colour that was used historically is harmless.
+async function deleteThreadColour(id) {
+  const existing = await getThreadColourByIdForAdmin(id);
+  if (!existing) throw new ThreadColourError("Thread colour not found", 404);
+  await deleteRecord(TABLE, id);
+}
+
+module.exports = {
+  ThreadColourError,
+  getThreadColours,
+  isValidThreadColourCode,
+  listThreadColoursForAdmin,
+  getThreadColourByIdForAdmin,
+  createThreadColour,
+  updateThreadColour,
+  deleteThreadColour,
+};

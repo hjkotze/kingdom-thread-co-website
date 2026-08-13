@@ -15,3 +15,7 @@ export function sendAdminReply(id, body) {
 export function createSnapshot(id, input) {
   return apiFetch(`/admin/quotes/${id}/snapshots`, { method: "POST", body: JSON.stringify(input) });
 }
+
+export function sendSnapshot(id) {
+  return apiFetch(`/admin/quotes/${id}/snapshots/send`, { method: "POST" });
+}

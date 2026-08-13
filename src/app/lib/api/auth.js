@@ -1,9 +1,38 @@
 import { apiFetch } from "./client";
 
-export function registerCustomer({ email, password, fullName, phone }) {
+export function registerCustomer({ email, password, fullName, cellPhone }) {
   return apiFetch("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, fullName, phone }),
+    body: JSON.stringify({ email, password, fullName, cellPhone }),
+  });
+}
+
+export function updateProfile({
+  fullName,
+  addressLine1,
+  addressComplex,
+  addressSuburb,
+  addressPostalCode,
+  addressProvince,
+  cellPhone,
+  landlineAreaCode,
+  landlineNumber,
+  notifyOrderStatusChanges,
+}) {
+  return apiFetch("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      fullName,
+      addressLine1,
+      addressComplex,
+      addressSuburb,
+      addressPostalCode,
+      addressProvince,
+      cellPhone,
+      landlineAreaCode,
+      landlineNumber,
+      notifyOrderStatusChanges,
+    }),
   });
 }
 
@@ -43,4 +72,8 @@ export function logout({ asAdmin = false } = {}) {
 
 export function fetchCurrentUser() {
   return apiFetch("/auth/me");
+}
+
+export function fetchCurrentAdminUser() {
+  return apiFetch("/admin/auth/me");
 }

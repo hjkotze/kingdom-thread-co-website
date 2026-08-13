@@ -26,7 +26,7 @@ export default function ProductCategories({
   }, []);
 
   return (
-    <section id="products" className="py-28 bg-card">
+    <section id="products" className="sticky top-0 z-20 py-28 min-h-screen bg-card">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
@@ -120,14 +120,7 @@ export default function ProductCategories({
                     </p>
                     <button
                       onClick={() => {
-                        setActiveFilter(
-                          cat.slug.replace(
-                            "home-",
-                            "pillow-",
-                          ) === cat.slug
-                            ? cat.slug
-                            : "all",
-                        );
+                        setActiveFilter(cat.id);
                         scrollTo("#shop");
                       }}
                       className="self-start flex items-center gap-2 text-accent text-sm font-medium hover:gap-3 transition-all"

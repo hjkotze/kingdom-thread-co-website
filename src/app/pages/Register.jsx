@@ -11,9 +11,10 @@ export default function Register() {
   const location = useLocation();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [cellPhone, setCellPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState(null);
@@ -27,10 +28,14 @@ export default function Register() {
       setError("Passwords don't match.");
       return;
     }
+    if (!agreedToPolicies) {
+      setError("Please agree to the Privacy Policy and Cookie Policy to continue.");
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const data = await register({ email, password, fullName, phone });
+      const data = await register({ email, password, fullName, cellPhone });
       setRegisteredEmail(data.email);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -102,11 +107,11 @@ export default function Register() {
           required
         />
         <AuthFormField
-          label="Phone (optional)"
+          label="Cell phone (optional)"
           type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="082 123 4567"
+          value={cellPhone}
+          onChange={(e) => setCellPhone(e.target.value)}
+          placeholder="0821234567"
           autoComplete="tel"
         />
         <AuthFormField
@@ -127,9 +132,28 @@ export default function Register() {
           autoComplete="new-password"
           required
         />
+        <label className="flex items-start gap-2.5 text-sm text-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreedToPolicies}
+            onChange={(e) => setAgreedToPolicies(e.target.checked)}
+            className="w-4 h-4 mt-0.5 shrink-0"
+            required
+          />
+          <span>
+            I agree to the{" "}
+            <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-accent font-medium">
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a href="/cookie-policy" target="_blank" rel="noreferrer" className="text-accent font-medium">
+              Cookie Policy
+            </a>
+          </span>
+        </label>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !agreedToPolicies}
           className="bg-accent text-accent-foreground py-3.5 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
           style={{ borderRadius: "var(--radius)" }}
         >

@@ -1,12 +1,35 @@
-const STATS = [
-  { value: "500+", label: "Orders fulfilled" },
-  { value: "100%", label: "Custom designs" },
-  { value: "7–10", label: "Day turnaround" },
-];
+import { useEffect, useState } from "react";
+import { fetchHomeStats } from "../lib/api/homeStats";
 
 export default function Hero({ scrollTo }) {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchHomeStats()
+      .then((data) => {
+        if (!cancelled) setStats(data);
+      })
+      .catch(() => {
+        // leave stats null on failure — same "—" placeholder as loading,
+        // rather than fabricating a number when the real one is unknown.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Reserves the same layout while loading rather than showing nothing —
+  // "—" rather than a placeholder number, since these are real stats now
+  // (§ homepage stats), not decorative figures.
+  const displayStats = [
+    { value: stats ? `${stats.ordersFulfilled}+` : "—", label: "Orders fulfilled" },
+    { value: stats ? `${stats.customDesignPercent}%` : "—", label: "Custom designs" },
+    { value: stats?.turnaroundText || "—", label: "Day turnaround" },
+  ];
+
   return (
-    <section className="relative pt-16 min-h-screen flex items-center overflow-hidden">
+    <section id="hero" className="sticky top-0 z-10 pt-28 min-h-screen flex items-center overflow-hidden">
       <div className="absolute inset-0 bg-muted">
         <img
           src=""
@@ -61,7 +84,7 @@ export default function Hero({ scrollTo }) {
             </button>
           </div>
           <div className="flex items-center gap-6 mt-12 pt-10 border-t border-border">
-            {STATS.map((stat) => (
+            {displayStats.map((stat) => (
               <div key={stat.label}>
                 <p
                   className="text-2xl font-semibold text-foreground"

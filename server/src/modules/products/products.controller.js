@@ -1,13 +1,5 @@
 const productsService = require("./products.service");
 
-async function listCategories(req, res, next) {
-  try {
-    res.json({ categories: await productsService.getCategories() });
-  } catch (err) {
-    next(err);
-  }
-}
-
 async function listProducts(req, res, next) {
   try {
     res.json({ products: await productsService.getProducts() });
@@ -26,4 +18,4 @@ async function getProduct(req, res, next) {
   }
 }
 
-module.exports = { listCategories, listProducts, getProduct };
+module.exports = { listProducts, getProduct };

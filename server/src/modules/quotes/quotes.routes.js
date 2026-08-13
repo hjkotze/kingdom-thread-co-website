@@ -12,5 +12,8 @@ router.post("/", controller.create);
 router.get("/", controller.list);
 router.get("/:id", controller.getOne);
 router.post("/:id/accept", controller.accept);
+router.post("/:id/messages", controller.reply);
+router.get("/:id/quote-pdf", controller.downloadQuotePdf);
+router.get("/:id/invoice-pdf", controller.downloadInvoicePdf);
 
 module.exports = router;

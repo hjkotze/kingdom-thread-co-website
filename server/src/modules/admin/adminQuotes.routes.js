@@ -9,5 +9,7 @@ router.get("/", controller.list);
 router.get("/:id", controller.getOne);
 router.post("/:id/messages", controller.reply);
 router.post("/:id/snapshots", controller.createSnapshot);
+router.post("/:id/snapshots/send", controller.sendSnapshot);
+router.get("/:id/quote-pdf", controller.downloadQuotePdf);
 
 module.exports = router;

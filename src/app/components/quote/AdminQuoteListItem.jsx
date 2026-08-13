@@ -35,6 +35,9 @@ export default function AdminQuoteListItem({ quote, isActive, compact = false })
       }}
     >
       <div className="min-w-0">
+        <p className="text-xs text-accent mb-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>
+          {quote.quoteNumber || `Quote #${quote.id}`}
+        </p>
         <p className="text-foreground font-medium mb-1 truncate">
           {quote.productName}
           {!compact && <span className="text-muted-foreground font-normal"> — {quote.customerName}</span>}
@@ -42,6 +45,8 @@ export default function AdminQuoteListItem({ quote, isActive, compact = false })
         {!compact && (
           <p className="text-xs text-muted-foreground">
             {quote.size} · {quote.colour} · Qty {quote.quantity} · {new Date(quote.createdAt).toLocaleDateString()}
+            {" · "}
+            {quote.categoryLabel || "No category"}
           </p>
         )}
         {isActive && (

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useLocation } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { getQuote } from "../lib/api/quotes";
+import { getQuote, sendCustomerReply } from "../lib/api/quotes";
 import AttachmentsSection from "../components/quote/AttachmentsSection";
 import CustomerFormalQuoteSection from "../components/quote/CustomerFormalQuoteSection";
+import CustomerInvoiceSection from "../components/quote/CustomerInvoiceSection";
+import RateProductWidget from "../components/quote/RateProductWidget";
+import Header from "../components/Header";
+import { ApiError } from "../lib/api/client";
 
 const STATUS_LABELS = {
   new: "New",
@@ -16,9 +20,17 @@ const STATUS_LABELS = {
 
 export default function QuoteDetail() {
   const { id } = useParams();
+  // Set by QuoteReview.jsx when a design-file upload failed right after
+  // submitting this quote — see the comment there. Read once; a page
+  // refresh clears router state naturally so this doesn't linger forever.
+  const { state: locationState } = useLocation();
+  const failedUploads = locationState?.failedUploads || null;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [replyError, setReplyError] = useState("");
 
   const refetch = useCallback(() => {
     return getQuote(id).then((result) => setData(result));
@@ -41,28 +53,49 @@ export default function QuoteDetail() {
     };
   }, [id]);
 
+  const handleReply = async (e) => {
+    e.preventDefault();
+    if (!reply.trim()) return;
+    setSending(true);
+    setReplyError("");
+    try {
+      await sendCustomerReply(id, reply.trim());
+      setReply("");
+      await refetch();
+    } catch (err) {
+      setReplyError(err instanceof ApiError ? err.message : "Failed to send. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (loading) return null;
   if (notFound || !data) {
     return (
-      <section className="min-h-screen bg-background py-28 px-6">
-        <div className="max-w-2xl mx-auto text-center">
-          <p className="text-muted-foreground">Quote not found.</p>
-          <Link to="/account" className="text-accent text-sm font-medium">
-            Back to your account
-          </Link>
-        </div>
-      </section>
+      <>
+        <Header />
+        <section className="min-h-screen bg-background py-28 px-6">
+          <div className="max-w-2xl mx-auto text-center">
+            <p className="text-muted-foreground">Quote not found.</p>
+            <Link to="/account" className="text-accent text-sm font-medium">
+              Back to your account
+            </Link>
+          </div>
+        </section>
+      </>
     );
   }
 
-  const { quote, messages, attachments, snapshots } = data;
+  const { quote, messages, attachments, snapshots, invoice, lines, payments: invoicePayments, customerAddress } = data;
   const latestSnapshot = snapshots[0] || null;
   // "finalised" means a formal quote exists and hasn't been accepted yet —
   // just as much a pending action for the customer as an unanswered reply.
   const pendingCustomerResponse = quote.status === "awaiting_customer" || quote.status === "finalised";
 
   return (
-    <section className="min-h-screen bg-background py-28 px-6">
+    <>
+      <Header />
+      <section className="min-h-screen bg-background py-28 px-6">
       <div className="max-w-2xl mx-auto">
         <Link
           to="/account"
@@ -117,17 +150,36 @@ export default function QuoteDetail() {
           </dl>
         </div>
 
+        <RateProductWidget productId={quote.productId} productName={quote.productName} />
+
         {quote.customisable && (
           <div className="mb-8">
             <h2 className="text-sm text-foreground font-medium mb-4">Design files</h2>
+            {failedUploads && (
+              <p
+                className="text-sm px-4 py-3 mb-4 bg-destructive/10 border border-destructive/30 text-destructive"
+                style={{ borderRadius: "var(--radius)" }}
+              >
+                Your {failedUploads.join(" and ")} didn&apos;t upload when you submitted this request. Please
+                attach {failedUploads.length > 1 ? "them" : "it"} again below.
+              </p>
+            )}
             <AttachmentsSection quoteId={quote.id} attachments={attachments} onUploaded={refetch} />
           </div>
         )}
 
         <CustomerFormalQuoteSection quote={quote} snapshot={latestSnapshot} onAccepted={refetch} />
 
+        <CustomerInvoiceSection
+          quote={quote}
+          invoice={invoice}
+          lines={lines}
+          payments={invoicePayments}
+          customerAddress={customerAddress}
+        />
+
         <h2 className="text-sm text-foreground font-medium mb-4">Communication</h2>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 mb-6">
           {messages.map((m) => (
             <div
               key={m.id}
@@ -135,15 +187,43 @@ export default function QuoteDetail() {
               style={{ borderRadius: "var(--radius)" }}
             >
               <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                <span>{m.senderType === "customer" ? "You" : m.senderType === "company" ? "Woven" : "System"}</span>
+                <span>{m.senderType === "customer" ? "You" : m.senderType === "company" ? "Kingdom Thread Co" : "System"}</span>
                 <span>{new Date(m.createdAt).toLocaleString()}</span>
               </div>
               <p className="text-sm text-foreground whitespace-pre-wrap">{m.body}</p>
             </div>
           ))}
         </div>
+
+        <form onSubmit={handleReply} className="flex flex-col gap-3">
+          {replyError && (
+            <p
+              className="text-sm text-destructive bg-destructive/10 border border-destructive/30 px-4 py-2.5"
+              style={{ borderRadius: "var(--radius)" }}
+            >
+              {replyError}
+            </p>
+          )}
+          <textarea
+            rows={4}
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            placeholder="Reply, ask a question, or add more detail…"
+            className="bg-input-background border border-border px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            style={{ borderRadius: "var(--radius)" }}
+          />
+          <button
+            type="submit"
+            disabled={sending}
+            className="bg-accent text-accent-foreground py-3 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60 self-start px-6"
+            style={{ borderRadius: "var(--radius)" }}
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </form>
       </div>
-    </section>
+      </section>
+    </>
   );
 }
 

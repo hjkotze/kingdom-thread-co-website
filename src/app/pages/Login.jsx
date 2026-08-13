@@ -5,6 +5,7 @@ import { resendVerification } from "../lib/api/auth";
 import { ApiError } from "../lib/api/client";
 import AuthCard from "../components/auth/AuthCard";
 import AuthFormField from "../components/auth/AuthFormField";
+import Header from "../components/Header";
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,7 +18,11 @@ export default function Login() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendState, setResendState] = useState("idle"); // idle | sending | sent
 
-  const resumeTo = location.state?.from || "/";
+  // Falls back to /account (not "/") — same default VerifyEmail.jsx and
+  // ResetPassword.jsx already use when there's no in-progress quote draft
+  // to resume. A direct login should land on the customer's own
+  // quotes/account area, not back on the marketing homepage.
+  const resumeTo = location.state?.from || "/account";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,7 +54,9 @@ export default function Login() {
   };
 
   return (
-    <AuthCard
+    <>
+      <Header />
+      <AuthCard
       eyebrow="Welcome back"
       title="Log in"
       subtitle="Log in to start a quote request or check on an existing one."
@@ -106,6 +113,7 @@ export default function Login() {
           </button>
         )}
       </form>
-    </AuthCard>
+      </AuthCard>
+    </>
   );
 }

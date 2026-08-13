@@ -2,11 +2,16 @@ const authService = require("./auth.service");
 const mailer = require("../../lib/mailer");
 const emailTemplates = require("../../lib/emailTemplates");
 const env = require("../../config/env");
+const { PROVINCES } = require("../../lib/address");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const RESEND_COOLDOWN_MINUTES = 2;
 const RESET_COOLDOWN_MINUTES = 2;
+
+const CELL_PHONE_RE = /^\d{10}$/;
+const LANDLINE_AREA_CODE_RE = /^\d{3}$/;
+const LANDLINE_NUMBER_RE = /^\d{7}$/;
 
 function validateRegisterInput({ email, password, fullName }) {
   if (!email || !EMAIL_RE.test(email)) return "A valid email address is required.";
@@ -14,6 +19,45 @@ function validateRegisterInput({ email, password, fullName }) {
     return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   if (!fullName || !fullName.trim()) return "Full name is required.";
+  return null;
+}
+
+// Every field optional (landline as a pair — either both parts or
+// neither), but whatever is provided must be in the right shape. Shared
+// by registration and profile updates, the only two places phone numbers
+// are ever written.
+function validatePhoneFields({ cellPhone, landlineAreaCode, landlineNumber }) {
+  if (cellPhone && !CELL_PHONE_RE.test(cellPhone)) {
+    return "Cell phone number must be exactly 10 digits.";
+  }
+  const hasAreaCode = Boolean(landlineAreaCode);
+  const hasNumber = Boolean(landlineNumber);
+  if (hasAreaCode !== hasNumber) {
+    return "Please provide both the landline area code and number, or leave both blank.";
+  }
+  if (hasAreaCode && !LANDLINE_AREA_CODE_RE.test(landlineAreaCode)) {
+    return "Landline area code must be exactly 3 digits.";
+  }
+  if (hasNumber && !LANDLINE_NUMBER_RE.test(landlineNumber)) {
+    return "Landline number must be exactly 7 digits.";
+  }
+  return null;
+}
+
+// Street/suburb/postal code/province must arrive together or not at all
+// (complex is independently optional either way) — same both-or-neither
+// shape as the landline validator above, and for the same reason: a half
+// -entered address is worse than none, since it'd otherwise pass the
+// orders.service.js "has an address" check with unusable data.
+function validateAddressFields({ addressLine1, addressSuburb, addressPostalCode, addressProvince }) {
+  const provided = [addressLine1, addressSuburb, addressPostalCode, addressProvince];
+  const anyProvided = provided.some((v) => v && v.trim());
+  if (!anyProvided) return null;
+  const allProvided = provided.every((v) => v && v.trim());
+  if (!allProvided) {
+    return "Please fill in street, suburb, postal code, and province, or leave the address blank.";
+  }
+  if (!PROVINCES.includes(addressProvince)) return "Invalid province.";
   return null;
 }
 
@@ -36,16 +80,18 @@ async function sendVerificationEmail(user) {
 // anything until the link in the verification email is clicked.
 async function register(req, res, next) {
   try {
-    const { email, password, fullName, phone } = req.body || {};
+    const { email, password, fullName, cellPhone } = req.body || {};
     const validationError = validateRegisterInput({ email, password, fullName });
     if (validationError) return res.status(400).json({ error: validationError });
+    const phoneError = validatePhoneFields({ cellPhone });
+    if (phoneError) return res.status(400).json({ error: phoneError });
 
     const existing = await authService.findUserByEmail(email);
     if (existing) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
 
-    const user = await authService.createUser({ email, password, fullName, phone, role: "customer" });
+    const user = await authService.createUser({ email, password, fullName, cellPhone, role: "customer" });
 
     try {
       await sendVerificationEmail(user);
@@ -229,11 +275,57 @@ function makeLogin(expectedRole) {
 }
 
 async function logout(req, res, next) {
+  const cookieName = req.sessionCookieName || "blankets.sid";
   req.session.destroy((err) => {
     if (err) return next(err);
-    res.clearCookie("blankets.sid");
+    res.clearCookie(cookieName);
     res.status(204).end();
   });
+}
+
+// Self-service only — deliberately no admin equivalent anywhere in this
+// app. Always operates on the logged-in session's own userId, never an
+// id from the request body/params, so there's no way to target another
+// account even by tampering with the request.
+async function updateProfile(req, res, next) {
+  try {
+    if (!req.session || !req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    const {
+      fullName,
+      addressLine1,
+      addressComplex,
+      addressSuburb,
+      addressPostalCode,
+      addressProvince,
+      cellPhone,
+      landlineAreaCode,
+      landlineNumber,
+      notifyOrderStatusChanges,
+    } = req.body || {};
+    if (!fullName || !fullName.trim()) return res.status(400).json({ error: "Full name is required." });
+    const phoneError = validatePhoneFields({ cellPhone, landlineAreaCode, landlineNumber });
+    if (phoneError) return res.status(400).json({ error: phoneError });
+    const addressError = validateAddressFields({ addressLine1, addressSuburb, addressPostalCode, addressProvince });
+    if (addressError) return res.status(400).json({ error: addressError });
+
+    const user = await authService.updateProfile(req.session.userId, {
+      fullName: fullName.trim(),
+      addressLine1,
+      addressComplex,
+      addressSuburb,
+      addressPostalCode,
+      addressProvince,
+      cellPhone,
+      landlineAreaCode,
+      landlineNumber,
+      notifyOrderStatusChanges,
+    });
+    res.json({ user: authService.toPublicUser(user) });
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function me(req, res, next) {
@@ -259,4 +351,5 @@ module.exports = {
   loginAdmin: makeLogin("admin"),
   logout,
   me,
+  updateProfile,
 };

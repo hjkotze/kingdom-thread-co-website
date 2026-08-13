@@ -4,14 +4,20 @@ const env = require("./config/env");
 const sessionMiddleware = require("./middleware/session");
 const errorHandler = require("./middleware/errorHandler");
 const apiRoutes = require("./routes");
+const { ensureInitialAdmin } = require("./lib/bootstrapAdmin");
 
 const app = express();
+
+// Fire-and-forget: creates INITIAL_ADMIN_EMAIL as an admin on first boot if
+// no admin exists yet, then becomes permanently inert. Never blocks app
+// startup or crashes it — see server/src/lib/bootstrapAdmin.js.
+ensureInitialAdmin().catch((err) => console.error("Initial admin bootstrap failed:", err.message));
 
 app.set("trust proxy", 1); // HostKing likely terminates TLS at a proxy in front of the app
 
 app.use(
   cors({
-    origin: env.frontendOrigins,
+    origin: (origin, callback) => callback(null, env.isAllowedOrigin(origin)),
     credentials: true,
   }),
 );

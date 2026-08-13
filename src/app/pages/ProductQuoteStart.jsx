@@ -4,6 +4,7 @@ import { apiFetch, ApiError } from "../lib/api/client";
 import { useQuoteDraft } from "../lib/quote/QuoteDraftContext";
 import AuthCard from "../components/auth/AuthCard";
 import FormSelect from "../components/quote/FormSelect";
+import Header from "../components/Header";
 
 export default function ProductQuoteStart() {
   const { productId } = useParams();
@@ -48,16 +49,21 @@ export default function ProductQuoteStart() {
   if (loading) return null;
   if (notFound || !product) {
     return (
-      <AuthCard eyebrow="Quote request" title="Product not found">
-        <p className="text-sm text-muted-foreground">
-          This product may no longer be available. Head back to the shop to pick another.
-        </p>
-      </AuthCard>
+      <>
+        <Header />
+        <AuthCard eyebrow="Quote request" title="Product not found">
+          <p className="text-sm text-muted-foreground">
+            This product may no longer be available. Head back to the shop to pick another.
+          </p>
+        </AuthCard>
+      </>
     );
   }
 
   return (
-    <AuthCard
+    <>
+      <Header />
+      <AuthCard
       eyebrow="Step 1 of 2"
       title={product.name}
       subtitle={`from R${product.price} · ${product.subtitle}`}
@@ -82,6 +88,22 @@ export default function ProductQuoteStart() {
             style={{ borderRadius: "var(--radius)" }}
           />
         </div>
+
+        {product.price !== null && (
+          <div className="flex justify-between text-sm border-t border-border pt-4">
+            <div className="text-muted-foreground">
+              <p>Unit price</p>
+              <p className="mt-1">Total</p>
+            </div>
+            <div className="text-right text-foreground">
+              <p>R{Number(product.price).toFixed(2)}</p>
+              <p className="mt-1 font-medium">
+                R{(Number(product.price) * (Number(quantity) || 0)).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        )}
+
         <button
           type="submit"
           className="bg-accent text-accent-foreground py-3.5 text-sm font-medium hover:opacity-90 transition-opacity mt-1"
@@ -90,6 +112,7 @@ export default function ProductQuoteStart() {
           Continue
         </button>
       </form>
-    </AuthCard>
+      </AuthCard>
+    </>
   );
 }

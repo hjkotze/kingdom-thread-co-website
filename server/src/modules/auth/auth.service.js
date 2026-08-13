@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const db = require("../../config/db");
+const { formatAddress } = require("../../lib/address");
 
 const SALT_ROUNDS = 12;
 const VERIFICATION_TOKEN_TTL_HOURS = 24;
@@ -21,17 +22,51 @@ async function findUserById(id) {
   return db("users").where({ id }).first();
 }
 
-async function createUser({ email, password, fullName, phone, role = "customer", emailVerified = false }) {
+async function createUser({ email, password, fullName, cellPhone, role = "customer", emailVerified = false }) {
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
   const [id] = await db("users").insert({
     email: normalizeEmail(email),
     password_hash: passwordHash,
     full_name: fullName,
-    phone: phone || null,
+    cell_phone: cellPhone || null,
     role,
     email_verified: emailVerified,
   });
   return findUserById(id);
+}
+
+// Self-service only — no admin code path touches these fields (address,
+// cell phone, landline). Email/password/role are deliberately excluded
+// here; they go through their own dedicated, more carefully-guarded flows.
+async function updateProfile(
+  userId,
+  {
+    fullName,
+    addressLine1,
+    addressComplex,
+    addressSuburb,
+    addressPostalCode,
+    addressProvince,
+    cellPhone,
+    landlineAreaCode,
+    landlineNumber,
+    notifyOrderStatusChanges,
+  },
+) {
+  await db("users").where({ id: userId }).update({
+    full_name: fullName,
+    address_line1: addressLine1 || null,
+    address_complex: addressComplex || null,
+    address_suburb: addressSuburb || null,
+    address_postal_code: addressPostalCode || null,
+    address_province: addressProvince || null,
+    cell_phone: cellPhone || null,
+    landline_area_code: landlineAreaCode || null,
+    landline_number: landlineNumber || null,
+    notify_order_status_changes: Boolean(notifyOrderStatusChanges),
+    updated_at: new Date(),
+  });
+  return findUserById(userId);
 }
 
 async function deleteUser(id) {
@@ -127,7 +162,16 @@ function toPublicUser(user) {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
-    phone: user.phone,
+    cellPhone: user.cell_phone,
+    landlineAreaCode: user.landline_area_code,
+    landlineNumber: user.landline_number,
+    addressLine1: user.address_line1,
+    addressComplex: user.address_complex,
+    addressSuburb: user.address_suburb,
+    addressPostalCode: user.address_postal_code,
+    addressProvince: user.address_province,
+    address: formatAddress(user),
+    notifyOrderStatusChanges: Boolean(user.notify_order_status_changes),
     role: user.role,
     emailVerified: Boolean(user.email_verified),
   };
@@ -138,6 +182,7 @@ module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
+  updateProfile,
   deleteUser,
   verifyPassword,
   generateVerificationToken,

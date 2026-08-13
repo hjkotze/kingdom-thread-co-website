@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { Link } from "react-router";
 
 const STEPS = [
   {
@@ -23,11 +24,11 @@ const STEPS = [
   },
 ];
 
-export default function HowItWorks({ scrollTo }) {
+export default function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="py-28 bg-background"
+      className="sticky top-0 z-30 py-28 min-h-screen bg-background"
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-16">
@@ -90,12 +91,12 @@ export default function HowItWorks({ scrollTo }) {
             photo, a PDF. Our team will advise on what works
             best for each product.
           </p>
-          <button
-            onClick={() => scrollTo("#contact")}
+          <Link
+            to="/login"
             className="whitespace-nowrap text-sm text-accent font-medium flex items-center gap-2 hover:gap-3 transition-all"
           >
             Get in touch <ArrowRight size={14} />
-          </button>
+          </Link>
         </div>
       </div>
     </section>

@@ -1,4 +1,16 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+// Falls back to whatever host the page itself was loaded from (dev machine
+// localhost, or a LAN IP when testing from another device) rather than a
+// hardcoded value — a single build then works from any of them, since the
+// API is always on the same box as the frontend in dev, just port 3001.
+// Production sets VITE_API_URL explicitly (frontend/API live on different
+// domains there), which always takes priority over this.
+// Exported so any code building a raw URL (file/PDF download links, which
+// use a plain <a href> rather than apiFetch) resolves the API host the
+// same way — duplicating this fallback elsewhere previously caused
+// download links to break under the same localhost/LAN mismatch this
+// fixes for apiFetch.
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3001/api`;
 
 export class ApiError extends Error {
   constructor(message, status, code) {

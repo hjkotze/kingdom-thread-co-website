@@ -1,17 +1,6 @@
 import { useEffect, useState } from "react";
-import { Star } from "lucide-react";
-import { fetchProducts } from "../lib/api/products";
-
-const FILTER_OPTIONS = [
-  { value: "all", label: "All Products" },
-  { value: "blanket-budget", label: "Budget Blankets" },
-  { value: "blanket-premium", label: "Premium Blankets" },
-  { value: "pillow-budget", label: "Budget Pillows" },
-  { value: "pillow-premium", label: "Premium Pillows" },
-  { value: "duvet-budget", label: "Budget Duvets" },
-  { value: "duvet-premium", label: "Premium Duvets" },
-  { value: "socks", label: "Socks" },
-];
+import { fetchProducts, fetchCategories } from "../lib/api/products";
+import StarRating from "./StarRating";
 
 export default function Shop({
   activeFilter,
@@ -19,13 +8,16 @@ export default function Shop({
   onOrderNow,
 }) {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetchProducts()
-      .then((data) => {
-        if (!cancelled) setProducts(data.products);
+    Promise.all([fetchProducts(), fetchCategories()])
+      .then(([productsData, categoriesData]) => {
+        if (cancelled) return;
+        setProducts(productsData.products);
+        setCategories(categoriesData.categories);
       })
       .catch(() => {
         if (!cancelled) setProducts([]);
@@ -38,13 +30,22 @@ export default function Shop({
     };
   }, []);
 
+  // Filter buttons are built from the live category list rather than a
+  // hardcoded set — every product now links to a real Categories record
+  // (§ admin catalogue management), so filtering matches on that
+  // relationship (categoryId) instead of the old free-text slug.
+  const filterOptions = [
+    { value: "all", label: "All Products" },
+    ...categories.map((c) => ({ value: c.id, label: c.label })),
+  ];
+
   const filteredProducts =
     activeFilter === "all"
       ? products
-      : products.filter((p) => p.category === activeFilter);
+      : products.filter((p) => p.categoryId === activeFilter);
 
   return (
-    <section id="shop" className="py-28 bg-card">
+    <section id="shop" className="sticky top-0 z-40 py-28 min-h-screen bg-card">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
@@ -66,7 +67,7 @@ export default function Shop({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {FILTER_OPTIONS.map((f) => (
+            {filterOptions.map((f) => (
               <button
                 key={f.value}
                 onClick={() => setActiveFilter(f.value)}
@@ -161,15 +162,7 @@ export default function Shop({
                 </p>
 
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-1.5">
-                    <Star
-                      size={12}
-                      className="fill-accent text-accent"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {product.rating} ({product.reviews})
-                    </span>
-                  </div>
+                  <StarRating value={product.rating} count={product.reviews} />
                   <p
                     className="text-lg font-medium text-foreground"
                     style={{

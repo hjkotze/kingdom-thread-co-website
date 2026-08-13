@@ -5,7 +5,9 @@ import { getAdminQuote, sendAdminReply, listAdminQuotes } from "../lib/api/admin
 import { attachmentDownloadUrl } from "../lib/api/attachments";
 import { ApiError } from "../lib/api/client";
 import AdminFormalQuoteSection from "../components/quote/AdminFormalQuoteSection";
+import AdminInvoiceSection from "../components/quote/AdminInvoiceSection";
 import AdminQuoteListItem, { badgeStyle, badgeLabel } from "../components/quote/AdminQuoteListItem";
+import AdminLayout from "../components/admin/AdminLayout";
 
 export default function AdminQuoteDetail() {
   const { id } = useParams();
@@ -54,21 +56,22 @@ export default function AdminQuoteDetail() {
   if (loading) return null;
   if (!data) {
     return (
-      <section className="min-h-screen bg-background py-28 px-6">
-        <div className="max-w-2xl mx-auto text-center text-muted-foreground">Quote not found.</div>
-      </section>
+      <AdminLayout>
+        <p className="text-sm text-muted-foreground text-center">Quote not found.</p>
+      </AdminLayout>
     );
   }
 
-  const { quote, messages, attachments, snapshots } = data;
+  const { quote, messages, attachments, snapshots, invoice, order, lines, payments, workOrders, customerAddress } = data;
+  const combined = order && lines.length > 1;
   // Everything else still needing attention, so it stays visible on the
   // same screen while working the active item (§7) — not just the
   // dashboard's full list.
   const needsAttention = queue.filter((q) => q.id !== quote.id && q.needsResponse).slice(0, 6);
 
   return (
-    <section className="min-h-screen bg-background py-28 px-6">
-      <div className="max-w-5xl mx-auto grid lg:grid-cols-[1fr_300px] gap-10 items-start">
+    <AdminLayout maxWidthClassName="max-w-5xl">
+      <div className="grid lg:grid-cols-[1fr_300px] gap-10 items-start">
         <div className="min-w-0">
           <Link
             to="/admin"
@@ -91,8 +94,17 @@ export default function AdminQuoteDetail() {
               {badgeLabel(quote)}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mb-8">
+          <p className="text-sm text-muted-foreground mb-1">
             Quote #{quote.id} · {quote.customerName} ({quote.customerEmail})
+          </p>
+          <p className="text-xs text-accent mb-8" style={{ fontFamily: "'DM Mono', monospace", minHeight: "1em" }}>
+            {[
+              snapshots[0]?.quoteNumber,
+              order?.orderNumber && `Order ${order.orderNumber}`,
+              invoice?.invoiceNumber && `Invoice ${invoice.invoiceNumber}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
 
           <div className="bg-card border border-border p-6 mb-8" style={{ borderRadius: "var(--radius)" }}>
@@ -100,6 +112,13 @@ export default function AdminQuoteDetail() {
               <Row label="Size" value={quote.size} />
               <Row label="Colour" value={quote.colour} />
               <Row label="Quantity" value={quote.quantity} />
+              {/* quote.price is the product's per-unit price at request
+                  time (see quotes.service.js) — never scaled by quantity,
+                  so show it labelled as such alongside the actual total. */}
+              {quote.price !== null && <Row label="Unit price" value={`R${quote.price}`} />}
+              {quote.price !== null && (
+                <Row label="Total price" value={`R${(quote.price * quote.quantity).toFixed(2)}`} />
+              )}
               {quote.requirements && <Row label="Requirements" value={quote.requirements} />}
               {quote.font && <Row label="Font" value={quote.font} />}
               {quote.fontColour && <Row label="Font colour" value={quote.fontColour} />}
@@ -132,7 +151,30 @@ export default function AdminQuoteDetail() {
             </div>
           )}
 
+          {combined && (
+            <div
+              className="bg-accent/10 border border-accent/30 px-4 py-3 mb-8"
+              style={{ borderRadius: "var(--radius)" }}
+            >
+              <p className="text-sm text-foreground font-medium mb-1">
+                Part of combined order {order.orderNumber} — {lines.length} items
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {lines.map((l) => l.productName).join(", ")}
+              </p>
+            </div>
+          )}
+
           <AdminFormalQuoteSection quote={quote} snapshots={snapshots} onCreated={load} />
+
+          <AdminInvoiceSection
+            invoice={invoice}
+            lines={lines}
+            payments={payments}
+            workOrders={workOrders}
+            customerAddress={customerAddress}
+            onUpdated={load}
+          />
 
           <h2 className="text-sm text-foreground font-medium mb-4">Communication</h2>
           <div className="flex flex-col gap-3 mb-8">
@@ -190,7 +232,7 @@ export default function AdminQuoteDetail() {
           )}
         </aside>
       </div>
-    </section>
+    </AdminLayout>
   );
 }
 

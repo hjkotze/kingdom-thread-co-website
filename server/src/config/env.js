@@ -10,18 +10,36 @@ function required(name) {
   return value;
 }
 
+const frontendOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+// Optional: a LAN subnet prefix (e.g. "192.168.2") to test devices — phones,
+// tablets — from any host on that subnet without listing each device's IP
+// individually. Off by default; only matters in development.
+const lanSubnet = (process.env.FRONTEND_LAN_SUBNET || "").trim();
+const lanOriginRegex = lanSubnet
+  ? new RegExp(`^https?://${lanSubnet.replace(/\./g, "\\.")}\\.\\d{1,3}(:\\d+)?$`)
+  : null;
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // non-browser requests (curl, server-to-server) send no Origin header
+  if (frontendOrigins.includes(origin)) return true;
+  if (lanOriginRegex && lanOriginRegex.test(origin)) return true;
+  return false;
+}
+
 module.exports = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || "development",
   isProduction: process.env.NODE_ENV === "production",
-  frontendOrigins: (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  frontendOrigins,
+  isAllowedOrigin,
 
   // Canonical URL used to build links in outbound emails (verification,
   // etc.) — the first FRONTEND_ORIGINS entry if not set explicitly.
-  frontendUrl: process.env.FRONTEND_URL || (process.env.FRONTEND_ORIGINS || "http://localhost:5173").split(",")[0].trim(),
+  frontendUrl: process.env.FRONTEND_URL || frontendOrigins[0] || "http://localhost:5173",
 
   db: {
     host: process.env.DB_HOST || "localhost",
@@ -35,9 +53,17 @@ module.exports = {
     ? required("SESSION_SECRET")
     : process.env.SESSION_SECRET || "dev-only-insecure-secret",
 
-  airtable: {
-    apiKey: process.env.AIRTABLE_API_KEY || "",
-    baseId: process.env.AIRTABLE_BASE_ID || "",
+  // Airtable — replaced by NocoDB (self-hosted) below. Kept commented out
+  // rather than deleted in case of rollback.
+  // airtable: {
+  //   apiKey: process.env.AIRTABLE_API_KEY || "",
+  //   baseId: process.env.AIRTABLE_BASE_ID || "",
+  // },
+
+  nocodb: {
+    baseUrl: process.env.NOCODB_BASE_URL || "",
+    apiToken: process.env.NOCODB_API_TOKEN || "",
+    baseId: process.env.NOCODB_BASE_ID || "",
   },
 
   // Outside the web root on HostKing — never served by a static
