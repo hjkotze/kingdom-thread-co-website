@@ -128,7 +128,7 @@ export default function ProductCategories({
                       View products <ArrowRight size={14} />
                     </button>
                   </div>
-                  <div className="h-64 md:h-auto bg-muted overflow-hidden">
+                  <div className="h-64 bg-muted overflow-hidden">
                     {cat.imageUrl && (
                       <img
                         src={cat.imageUrl}
