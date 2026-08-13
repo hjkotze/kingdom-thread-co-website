@@ -26,7 +26,7 @@ export default function ProductCategories({
   }, []);
 
   return (
-    <section id="products" className="sticky top-0 z-20 py-28 min-h-screen bg-card">
+    <section id="products" className="sticky top-0 z-20 py-28 min-h-screen bg-secondary">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
@@ -63,7 +63,7 @@ export default function ProductCategories({
               style={{ borderRadius: "var(--radius)" }}
             >
               <button
-                className="w-full text-left px-8 py-6 flex items-center justify-between bg-background hover:bg-secondary transition-colors"
+                className="w-full text-left px-8 py-6 flex items-center justify-between bg-background hover:bg-muted transition-colors"
                 onClick={() =>
                   setExpandedCategory(
                     expandedCategory === cat.slug
