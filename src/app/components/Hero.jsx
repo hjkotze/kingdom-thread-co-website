@@ -5,9 +5,13 @@ import { fetchHeroImages } from "../lib/api/heroImages";
 // Matches the two-box layout below (a larger box, then a smaller offset
 // one) — the NocoDB table itself allows any number of rows (§ hero images),
 // but this layout only has room for two, so extras beyond this are ignored.
+// Both boxes are sized to their actual uploaded image's native dimensions
+// (300x450 and 300x386 — confirmed directly) rather than an arbitrary
+// placeholder size, so object-cover below has no need to crop anything off
+// either image to fill its box.
 const IMAGE_BOX_CLASSES = [
-  "w-72 h-80",
-  "w-56 h-56 self-start",
+  "w-[300px] h-[450px]",
+  "w-[300px] h-[386px] self-start",
 ];
 
 export default function Hero({ scrollTo }) {
