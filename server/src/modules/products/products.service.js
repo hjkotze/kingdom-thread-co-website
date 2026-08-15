@@ -12,8 +12,12 @@ class ProductAdminError extends Error {
   }
 }
 
-function firstAttachmentUrl(field) {
-  return Array.isArray(field) && field.length > 0 ? field[0].url : null;
+// {id, url} per attachment — the minimal shape NocoDB accepts back on write
+// (confirmed directly against Categories' Image field, same attachment
+// mechanics), so it doubles as both the read shape and what
+// removeProductImage/reorderProductImages send back.
+function allAttachments(field) {
+  return Array.isArray(field) ? field.map((a) => ({ id: a.id, url: a.url })) : [];
 }
 
 // categoriesById: Map<airtableId, {slug, label}> — resolved once per fetch
@@ -40,7 +44,7 @@ function mapProductRecord(record, categoriesById) {
     // rating/reviews come from real customer ratings (product_ratings
     // table), not Airtable — attached separately by attachRatingsBatch/
     // attachRatingsSingle below, never read from the Airtable record.
-    imageUrl: firstAttachmentUrl(f["Image"]),
+    images: allAttachments(f["Image"]),
     imageFallbackColour: f["Image Fallback Colour"] || "",
     badge: f["Badge"] || null,
     description: f["Description"] || "",
@@ -95,7 +99,7 @@ async function writeThroughProductsCache(products) {
         printing_method: p.printingMethod,
         rating: p.rating,
         reviews: p.reviews,
-        image_url: p.imageUrl,
+        images: JSON.stringify(p.images),
         image_fallback_colour: p.imageFallbackColour,
         badge: p.badge,
         description: p.description,
@@ -121,7 +125,7 @@ function productRowToPublic(row) {
     printingMethod: row.printing_method,
     rating: row.rating === null ? null : Number(row.rating),
     reviews: row.reviews,
-    imageUrl: row.image_url,
+    images: typeof row.images === "string" ? JSON.parse(row.images) : row.images || [],
     imageFallbackColour: row.image_fallback_colour,
     badge: row.badge,
     description: row.description,
@@ -144,7 +148,7 @@ function productToPublic(p) {
     printingMethod: p.printingMethod,
     rating: p.rating,
     reviews: p.reviews,
-    imageUrl: p.imageUrl,
+    images: p.images,
     imageFallbackColour: p.imageFallbackColour,
     badge: p.badge,
     description: p.description,
@@ -274,13 +278,33 @@ async function deleteProduct(id) {
   await deleteRecord(TABLE, id);
 }
 
-async function setProductImage(id, { filename, contentType, buffer }) {
+// Appends — uploadAttachment adds to the field rather than replacing it, so
+// unlike the old single-image setProductImage this never clears first.
+async function addProductImage(id, { filename, contentType, buffer }) {
   const existing = await getProductByIdForAdmin(id);
   if (!existing) throw new ProductAdminError("Product not found", 404);
-  // Clear first — uploadAttachment adds to the field rather than replacing
-  // it, and only the first attachment is ever read (firstAttachmentUrl).
-  await updateRecord(TABLE, id, { Image: [] });
   await uploadAttachment(TABLE, id, "Image", { filename, contentType, buffer });
+  return getProductByIdForAdmin(id);
+}
+
+async function removeProductImage(id, attachmentId) {
+  const existing = await getProductByIdForAdmin(id);
+  if (!existing) throw new ProductAdminError("Product not found", 404);
+  const remaining = existing.images.filter((img) => img.id !== attachmentId);
+  await updateRecord(TABLE, id, { Image: remaining });
+  return getProductByIdForAdmin(id);
+}
+
+// order: array of attachment ids in the desired display order. Silently
+// drops any id that's no longer present (e.g. a stale request racing a
+// concurrent removal) rather than erroring — the resulting order is still
+// well-defined, just missing whatever's already gone.
+async function reorderProductImages(id, order) {
+  const existing = await getProductByIdForAdmin(id);
+  if (!existing) throw new ProductAdminError("Product not found", 404);
+  const byId = new Map(existing.images.map((img) => [img.id, img]));
+  const reordered = order.map((imgId) => byId.get(imgId)).filter(Boolean);
+  await updateRecord(TABLE, id, { Image: reordered });
   return getProductByIdForAdmin(id);
 }
 
@@ -293,5 +317,7 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
-  setProductImage,
+  addProductImage,
+  removeProductImage,
+  reorderProductImages,
 };

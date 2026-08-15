@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchProducts, fetchCategories } from "../lib/api/products";
 import StarRating from "./StarRating";
+import Carousel from "./Carousel";
 
 export default function Shop({
   activeFilter,
@@ -112,15 +113,13 @@ export default function Shop({
             >
               <div
                 className="relative h-56 overflow-hidden bg-background"
-                style={product.imageUrl ? undefined : { background: product.imageFallbackColour }}
+                style={product.images.length > 0 ? undefined : { background: product.imageFallbackColour }}
               >
-                {product.imageUrl && (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                  />
-                )}
+                <Carousel
+                  images={product.images}
+                  alt={product.name}
+                  imageClassName="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                />
                 {product.badge && (
                   <span
                     className="absolute top-3 left-3 bg-accent text-accent-foreground text-xs px-3 py-1 font-medium"

@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../components/admin/AdminLayout";
 import AdminConfigTabs from "../components/admin/AdminConfigTabs";
-import ImageField from "../components/admin/ImageField";
-import { listAdminCategories, createCategory, updateCategory, deleteCategory, uploadCategoryImage } from "../lib/api/adminCategories";
+import ImageGalleryField from "../components/admin/ImageGalleryField";
+import {
+  listAdminCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  addCategoryImage,
+  removeCategoryImage,
+  reorderCategoryImages,
+} from "../lib/api/adminCategories";
 import { ApiError } from "../lib/api/client";
 
 const emptyCategory = { slug: "", label: "", headline: "", body: "", callout: "", alt: "", sortOrder: 0 };
@@ -31,33 +39,47 @@ export default function AdminCategories() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = async (id, values, imageFile) => {
+  const handleSubmit = async (id, values, { images, pendingFiles }) => {
     setSubmitting(true);
     setError("");
     try {
       const { category: saved } = id === "new" ? await createCategory(values) : await updateCategory(id, values);
-      if (imageFile) {
-        try {
-          await uploadCategoryImage(saved.id, imageFile);
-        } catch (err) {
-          // Category details saved fine — only the image failed (wrong
-          // format, over the 5MB limit, a NocoDB hiccup, etc.). Previously
-          // this was swallowed silently (console.error only) and the form
-          // closed with no indication anything went wrong. Keep it open —
-          // pointed at the now-real id, so retrying updates rather than
-          // creating a duplicate — and surface the error. For a brand-new
-          // category this does mean the staged file has to be re-picked
-          // (it's a fresh form instance once editingId stops being "new"),
-          // which is an acceptable trade-off for never risking a duplicate.
-          setError(
-            err instanceof ApiError
-              ? `Category saved, but the image failed to upload: ${err.message}`
-              : "Category saved, but the image failed to upload. Please try again.",
-          );
-          setEditingId(saved.id);
-          await load();
-          return;
+      try {
+        // Removals first, then reorder the survivors, then append newly
+        // staged files last — so new uploads (which always append) land
+        // after the reordered existing images rather than the order call
+        // clobbering images that don't exist yet.
+        const original = id === "new" ? null : categories.find((c) => c.id === id);
+        const originalIds = (original?.images || []).map((img) => img.id);
+        const keptIds = images.map((img) => img.id);
+        const removedIds = originalIds.filter((imgId) => !keptIds.includes(imgId));
+        for (const attachmentId of removedIds) {
+          await removeCategoryImage(saved.id, attachmentId);
         }
+        if (keptIds.length > 1) {
+          await reorderCategoryImages(saved.id, keptIds);
+        }
+        for (const file of pendingFiles) {
+          await addCategoryImage(saved.id, file);
+        }
+      } catch (err) {
+        // Category details saved fine — only an image operation failed
+        // (wrong format, over the 5MB limit, a NocoDB hiccup, etc.).
+        // Previously this was swallowed silently (console.error only) and
+        // the form closed with no indication anything went wrong. Keep it
+        // open — pointed at the now-real id, so retrying updates rather
+        // than creating a duplicate — and surface the error. For a
+        // brand-new category any still-staged files have to be re-picked
+        // (it's a fresh form instance once editingId stops being "new"),
+        // an acceptable trade-off for never risking a duplicate.
+        setError(
+          err instanceof ApiError
+            ? `Category saved, but an image change failed: ${err.message}`
+            : "Category saved, but an image change failed. Please try again.",
+        );
+        setEditingId(saved.id);
+        await load();
+        return;
       }
       await load();
       setEditingId(null);
@@ -108,7 +130,7 @@ export default function AdminCategories() {
       {editingId === "new" && (
         <div className="mb-4">
           <CategoryForm
-            onSubmit={(values, file) => handleSubmit("new", values, file)}
+            onSubmit={(values, imageChanges) => handleSubmit("new", values, imageChanges)}
             onCancel={() => setEditingId(null)}
             submitting={submitting}
           />
@@ -121,7 +143,7 @@ export default function AdminCategories() {
             <CategoryForm
               key={category.id}
               category={category}
-              onSubmit={(values, file) => handleSubmit(category.id, values, file)}
+              onSubmit={(values, imageChanges) => handleSubmit(category.id, values, imageChanges)}
               onCancel={() => setEditingId(null)}
               submitting={submitting}
             />
@@ -136,7 +158,7 @@ export default function AdminCategories() {
                   className="w-12 h-12 shrink-0 border border-border overflow-hidden bg-secondary"
                   style={{ borderRadius: "var(--radius)" }}
                 >
-                  {category.imageUrl && <img src={category.imageUrl} alt="" className="w-full h-full object-cover" />}
+                  {category.images?.[0] && <img src={category.images[0].url} alt="" className="w-full h-full object-cover" />}
                 </div>
                 <div className="min-w-0">
                   <p className="text-foreground font-medium mb-1 truncate">{category.label}</p>
@@ -175,18 +197,25 @@ function CategoryForm({ category, onSubmit, onCancel, submitting }) {
         }
       : emptyCategory,
   );
-  const [imageFile, setImageFile] = useState(null);
+  const [images, setImages] = useState(category?.images || []);
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   const set = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(values, imageFile);
+    onSubmit(values, { images, pendingFiles });
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-card border border-border p-5 flex flex-col gap-4" style={{ borderRadius: "var(--radius)" }}>
-      <ImageField label="Category image" imageUrl={category?.imageUrl} onFileSelected={setImageFile} />
+      <ImageGalleryField
+        label="Category images"
+        images={images}
+        onImagesChange={setImages}
+        pendingFiles={pendingFiles}
+        onPendingFilesChange={setPendingFiles}
+      />
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Slug" value={values.slug} onChange={set("slug")} required placeholder="e.g. blanket-budget" />

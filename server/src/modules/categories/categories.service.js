@@ -10,8 +10,13 @@ class CategoryError extends Error {
   }
 }
 
-function firstAttachmentUrl(field) {
-  return Array.isArray(field) && field.length > 0 ? field[0].url : null;
+// {id, url} per attachment — the minimal shape NocoDB accepts back on write
+// (confirmed directly: writing an array of just {id, url} correctly
+// reorders/removes without needing the rest of the attachment object), so
+// it doubles as both the read shape and what removeCategoryImage/
+// reorderCategoryImages send back.
+function allAttachments(field) {
+  return Array.isArray(field) ? field.map((a) => ({ id: a.id, url: a.url })) : [];
 }
 
 function mapCategoryRecord(record) {
@@ -23,7 +28,7 @@ function mapCategoryRecord(record) {
     headline: f["Headline"] || "",
     body: f["Body"] || "",
     callout: f["Callout"] || "",
-    imageUrl: firstAttachmentUrl(f["Image"]),
+    images: allAttachments(f["Image"]),
     alt: f["Alt"] || "",
     sortOrder: typeof f["Sort Order"] === "number" ? f["Sort Order"] : 0,
     // Reverse link field, populated automatically by Airtable — read-only
@@ -50,7 +55,7 @@ async function writeThroughCache(categories) {
         headline: c.headline,
         body: c.body,
         callout: c.callout,
-        image_url: c.imageUrl,
+        images: JSON.stringify(c.images),
         alt: c.alt,
         sort_order: c.sortOrder,
         synced_at: now,
@@ -67,7 +72,7 @@ function categoryRowToPublic(row) {
     headline: row.headline,
     body: row.body,
     callout: row.callout,
-    imageUrl: row.image_url,
+    images: typeof row.images === "string" ? JSON.parse(row.images) : row.images || [],
     alt: row.alt,
     sortOrder: row.sort_order,
   };
@@ -81,7 +86,7 @@ function categoryToPublic(c) {
     headline: c.headline,
     body: c.body,
     callout: c.callout,
-    imageUrl: c.imageUrl,
+    images: c.images,
     alt: c.alt,
     sortOrder: c.sortOrder,
   };
@@ -173,15 +178,34 @@ async function deleteCategory(id) {
   await deleteRecord(TABLE, id);
 }
 
-async function setCategoryImage(id, { filename, contentType, buffer }) {
+// Appends — uploadAttachment adds to the field rather than replacing it, so
+// unlike the old single-image setCategoryImage this never clears first.
+async function addCategoryImage(id, { filename, contentType, buffer }) {
   const existing = await getCategoryByIdForAdmin(id);
   if (!existing) throw new CategoryError("Category not found", 404);
-  // Clear first — uploadAttachment adds to the field rather than replacing
-  // it, and only the first attachment is ever read (firstAttachmentUrl).
-  await updateRecord(TABLE, id, { Image: [] });
   await uploadAttachment(TABLE, id, "Image", { filename, contentType, buffer });
-  const refreshed = await getCategoryByIdForAdmin(id);
-  return refreshed;
+  return getCategoryByIdForAdmin(id);
+}
+
+async function removeCategoryImage(id, attachmentId) {
+  const existing = await getCategoryByIdForAdmin(id);
+  if (!existing) throw new CategoryError("Category not found", 404);
+  const remaining = existing.images.filter((img) => img.id !== attachmentId);
+  await updateRecord(TABLE, id, { Image: remaining });
+  return getCategoryByIdForAdmin(id);
+}
+
+// order: array of attachment ids in the desired display order. Silently
+// drops any id that's no longer present (e.g. a stale request racing a
+// concurrent removal) rather than erroring — the resulting order is still
+// well-defined, just missing whatever's already gone.
+async function reorderCategoryImages(id, order) {
+  const existing = await getCategoryByIdForAdmin(id);
+  if (!existing) throw new CategoryError("Category not found", 404);
+  const byId = new Map(existing.images.map((img) => [img.id, img]));
+  const reordered = order.map((imgId) => byId.get(imgId)).filter(Boolean);
+  await updateRecord(TABLE, id, { Image: reordered });
+  return getCategoryByIdForAdmin(id);
 }
 
 module.exports = {
@@ -192,5 +216,7 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
-  setCategoryImage,
+  addCategoryImage,
+  removeCategoryImage,
+  reorderCategoryImages,
 };

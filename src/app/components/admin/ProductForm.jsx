@@ -1,6 +1,6 @@
 import { useState } from "react";
 import TagListInput from "./TagListInput";
-import ImageField from "./ImageField";
+import ImageGalleryField from "./ImageGalleryField";
 import StarRating from "../StarRating";
 import FormSelect from "../quote/FormSelect";
 
@@ -46,14 +46,15 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
         }
       : emptyProduct,
   );
-  const [imageFile, setImageFile] = useState(null);
+  const [images, setImages] = useState(product?.images || []);
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   const set = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value }));
   const setChecked = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.checked }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(values, imageFile);
+    onSubmit(values, { images, pendingFiles });
   };
 
   return (
@@ -64,7 +65,13 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
         </p>
       )}
 
-      <ImageField label="Product image" imageUrl={product?.imageUrl} onFileSelected={setImageFile} />
+      <ImageGalleryField
+        label="Product images"
+        images={images}
+        onImagesChange={setImages}
+        pendingFiles={pendingFiles}
+        onPendingFilesChange={setPendingFiles}
+      />
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Name" value={values.name} onChange={set("name")} required />

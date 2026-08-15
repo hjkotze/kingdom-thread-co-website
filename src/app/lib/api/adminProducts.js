@@ -20,8 +20,16 @@ export function deleteProduct(id) {
   return apiFetch(`/admin/products/${id}`, { method: "DELETE" });
 }
 
-export function uploadProductImage(id, file) {
+export function addProductImage(id, file) {
   const formData = new FormData();
   formData.append("image", file);
-  return apiFetch(`/admin/products/${id}/image`, { method: "POST", body: formData });
+  return apiFetch(`/admin/products/${id}/images`, { method: "POST", body: formData });
+}
+
+export function removeProductImage(id, attachmentId) {
+  return apiFetch(`/admin/products/${id}/images/${attachmentId}`, { method: "DELETE" });
+}
+
+export function reorderProductImages(id, order) {
+  return apiFetch(`/admin/products/${id}/images/order`, { method: "PUT", body: JSON.stringify({ order }) });
 }

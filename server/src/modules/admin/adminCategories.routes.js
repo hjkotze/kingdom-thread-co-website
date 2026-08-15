@@ -11,6 +11,8 @@ router.get("/:id", controller.getOne);
 router.post("/", controller.create);
 router.patch("/:id", controller.update);
 router.delete("/:id", controller.destroy);
-router.post("/:id/image", adminImageUpload, controller.uploadImage);
+router.post("/:id/images", adminImageUpload, controller.addImage);
+router.delete("/:id/images/:attachmentId", controller.removeImage);
+router.put("/:id/images/order", controller.reorderImages);
 
 module.exports = router;

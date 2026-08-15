@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { fetchCategories } from "../lib/api/products";
+import Carousel from "./Carousel";
 
 export default function ProductCategories({
   setActiveFilter,
@@ -128,14 +129,8 @@ export default function ProductCategories({
                       View products <ArrowRight size={14} />
                     </button>
                   </div>
-                  <div className={`h-64 overflow-hidden ${cat.imageUrl ? "bg-card" : "bg-muted"}`}>
-                    {cat.imageUrl && (
-                      <img
-                        src={cat.imageUrl}
-                        alt={cat.alt}
-                        className="w-full h-full object-contain"
-                      />
-                    )}
+                  <div className={`h-64 overflow-hidden ${cat.images.length > 0 ? "bg-card" : "bg-muted"}`}>
+                    <Carousel images={cat.images} alt={cat.alt} />
                   </div>
                 </div>
               )}

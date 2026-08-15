@@ -5,7 +5,15 @@ import AdminLayout from "../components/admin/AdminLayout";
 import AdminConfigTabs from "../components/admin/AdminConfigTabs";
 import ProductForm from "../components/admin/ProductForm";
 import { listAdminCategories } from "../lib/api/adminCategories";
-import { getAdminProduct, createProduct, updateProduct, deleteProduct, uploadProductImage } from "../lib/api/adminProducts";
+import {
+  getAdminProduct,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  addProductImage,
+  removeProductImage,
+  reorderProductImages,
+} from "../lib/api/adminProducts";
 import { listShippingRates, getProductShippingRate, setProductShippingRate } from "../lib/api/adminShippingRates";
 import { ApiError } from "../lib/api/client";
 
@@ -36,32 +44,43 @@ export default function AdminProductEdit() {
     };
   }, [id, isNew]);
 
-  const handleSubmit = async (values, imageFile) => {
+  const handleSubmit = async (values, { images, pendingFiles }) => {
     setSubmitting(true);
     setError("");
     try {
       const { product: saved } = isNew ? await createProduct(values) : await updateProduct(id, values);
-      if (imageFile) {
-        try {
-          await uploadProductImage(saved.id, imageFile);
-        } catch (err) {
-          // Product details saved fine — only the image failed (wrong
-          // format, over the 5MB limit, a NocoDB hiccup, etc.). Previously
-          // this was swallowed silently (console.error only) and the admin
-          // navigated away none the wiser, leaving the product with no
-          // image and no indication anything went wrong. Stay on the page
-          // and surface it instead; for a new product, move to its edit
-          // route first so retrying "Save" updates it rather than creating
-          // a duplicate.
-          setError(
-            err instanceof ApiError
-              ? `Product saved, but the image failed to upload: ${err.message}`
-              : "Product saved, but the image failed to upload. Please try again.",
-          );
-          setSubmitting(false);
-          if (isNew) navigate(`/admin/configuration/products/${saved.id}`, { replace: true });
-          return;
+      try {
+        // Removals first, then reorder the survivors, then append newly
+        // staged files last — so new uploads (which always append) land
+        // after the reordered existing images rather than the order call
+        // clobbering images that don't exist yet.
+        const originalIds = (product?.images || []).map((img) => img.id);
+        const keptIds = images.map((img) => img.id);
+        const removedIds = originalIds.filter((imgId) => !keptIds.includes(imgId));
+        for (const attachmentId of removedIds) {
+          await removeProductImage(saved.id, attachmentId);
         }
+        if (keptIds.length > 1) {
+          await reorderProductImages(saved.id, keptIds);
+        }
+        for (const file of pendingFiles) {
+          await addProductImage(saved.id, file);
+        }
+      } catch (err) {
+        // Product details saved fine — only an image operation failed
+        // (wrong format, over the 5MB limit, a NocoDB hiccup, etc.).
+        // Previously this was swallowed silently (console.error only) and
+        // the admin navigated away none the wiser. Stay on the page and
+        // surface it instead; for a new product, move to its edit route
+        // first so retrying updates it rather than creating a duplicate.
+        setError(
+          err instanceof ApiError
+            ? `Product saved, but an image change failed: ${err.message}`
+            : "Product saved, but an image change failed. Please try again.",
+        );
+        setSubmitting(false);
+        if (isNew) navigate(`/admin/configuration/products/${saved.id}`, { replace: true });
+        return;
       }
       navigate("/admin/configuration/products");
     } catch (err) {

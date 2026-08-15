@@ -54,7 +54,7 @@ export default function AdminProducts() {
                 className="w-12 h-12 shrink-0 border border-border overflow-hidden bg-secondary"
                 style={{ borderRadius: "var(--radius)" }}
               >
-                {product.imageUrl && <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />}
+                {product.images?.[0] && <img src={product.images[0].url} alt="" className="w-full h-full object-cover" />}
               </div>
               <div className="min-w-0">
                 <p className="text-foreground font-medium mb-1 truncate">{product.name}</p>

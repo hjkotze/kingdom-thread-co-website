@@ -54,10 +54,10 @@ async function destroy(req, res, next) {
   }
 }
 
-async function uploadImage(req, res, next) {
+async function addImage(req, res, next) {
   try {
     if (!req.file) return res.status(400).json({ error: "No image uploaded." });
-    const product = await service.setProductImage(req.params.id, {
+    const product = await service.addProductImage(req.params.id, {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
       buffer: req.file.buffer,
@@ -71,4 +71,30 @@ async function uploadImage(req, res, next) {
   }
 }
 
-module.exports = { list, getOne, create, update, destroy, uploadImage };
+async function removeImage(req, res, next) {
+  try {
+    const product = await service.removeProductImage(req.params.id, req.params.attachmentId);
+    res.json({ product });
+  } catch (err) {
+    if (err instanceof service.ProductAdminError) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
+    next(err);
+  }
+}
+
+async function reorderImages(req, res, next) {
+  try {
+    const { order } = req.body || {};
+    if (!Array.isArray(order)) return res.status(400).json({ error: "order must be a list of image ids." });
+    const product = await service.reorderProductImages(req.params.id, order);
+    res.json({ product });
+  } catch (err) {
+    if (err instanceof service.ProductAdminError) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
+    next(err);
+  }
+}
+
+module.exports = { list, getOne, create, update, destroy, addImage, removeImage, reorderImages };
