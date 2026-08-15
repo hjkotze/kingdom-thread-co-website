@@ -128,12 +128,12 @@ export default function ProductCategories({
                       View products <ArrowRight size={14} />
                     </button>
                   </div>
-                  <div className="h-64 bg-muted overflow-hidden">
+                  <div className={`h-64 overflow-hidden ${cat.imageUrl ? "bg-card" : "bg-muted"}`}>
                     {cat.imageUrl && (
                       <img
                         src={cat.imageUrl}
                         alt={cat.alt}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     )}
                   </div>

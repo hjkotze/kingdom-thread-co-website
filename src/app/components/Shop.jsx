@@ -111,14 +111,14 @@ export default function Shop({
               style={{ borderRadius: "var(--radius)" }}
             >
               <div
-                className="relative h-56 overflow-hidden"
-                style={{ background: product.imageFallbackColour }}
+                className="relative h-56 overflow-hidden bg-background"
+                style={product.imageUrl ? undefined : { background: product.imageFallbackColour }}
               >
                 {product.imageUrl && (
                   <img
                     src={product.imageUrl}
                     alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />
                 )}
                 {product.badge && (
