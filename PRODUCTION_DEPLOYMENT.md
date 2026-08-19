@@ -1,20 +1,28 @@
-# Production deployment — HostKing
+# Production deployment — HostKing (DirectAdmin)
 
 Process for taking this app from local development to production on
-HostKing, for `kingdom-thread-co.co.za`. No secrets in this file — it's
-committed to git, same as `MANUAL_TESTING.md`. Real credentials go in
-`DEV_CREDENTIALS.md` (gitignored, local reference only) or directly into
-HostKing's env var UI / a server-side `.env` file (also never committed).
+HostKing, for `kingdom-thread-co.co.za`. HostKing's control panel is
+**DirectAdmin**, not cPanel — the steps below use DirectAdmin's own
+terminology (its Node.js hosting feature is CloudLinux's "Node.js
+Selector," the same underlying technology cPanel's "Setup Node.js App"
+uses, just under DirectAdmin's UI). Menu wording can vary slightly between
+DirectAdmin themes/versions, so treat the exact labels below as "look for
+something like this" rather than pixel-exact — confirm against the live
+panel on first use. No secrets in this file — it's committed to git, same
+as `MANUAL_TESTING.md`. Real credentials go in `DEV_CREDENTIALS.md`
+(gitignored, local reference only) or directly into DirectAdmin's env var
+UI / a server-side `.env` file (also never committed).
 
 ## Architecture recap (why the steps below look the way they do)
 
 - **Frontend**: a Vite/React static build (`npm run build` → `dist/`). No
   server-side rendering — deploy the built files to static hosting.
 - **Backend**: an Express API (`server/`), deployed separately as a HostKing
-  Node.js app (cPanel "Setup Node.js App", backed by Phusion Passenger).
-- **Database**: MySQL, provisioned through cPanel. **A brand-new, empty
-  database** — production does not reuse or import the dev database. See
-  step 1.
+  Node.js app via DirectAdmin's Node.js Selector ("Setup Node.js App,"
+  under Extra Features — Passenger-backed, same as cPanel's equivalent).
+- **Database**: MySQL, provisioned through DirectAdmin's MySQL Management.
+  **A brand-new, empty database** — production does not reuse or import the
+  dev database. See step 1.
 - **Product/category/thread-colour catalogue**: NocoDB, self-hosted at
   `nocodb.khjimaging.com`. Production uses **the same NocoDB instance and
   base as dev** — there is no separate production catalogue to provision or
@@ -41,9 +49,19 @@ HostKing's env var UI / a server-side `.env` file (also never committed).
 
 ## Prerequisites
 
-- HostKing cPanel access with: MySQL database creation, "Setup Node.js App"
-  (Node ≥ 18, matching `server/package.json` `engines`), Cron Jobs, and
-  SSL/AutoSSL for both the main domain and whatever subdomain hosts the API.
+- HostKing DirectAdmin access with: MySQL Management (database creation),
+  Node.js Selector / "Setup Node.js App" (Node ≥ 18, matching
+  `server/package.json` `engines`), Cron Jobs, and SSL Certificates
+  (Let's Encrypt) for both the main domain and whatever subdomain hosts
+  the API.
+- **SSH access to the account.** DirectAdmin's Node.js Selector has no
+  browser terminal and no "run an arbitrary command" box — beyond its own
+  "Run NPM Install" button, it only starts/stops/restarts the app. Steps 4
+  and 6 (`npx knex migrate:latest`, `npm run create-admin`) need a real
+  shell. Confirm SSH is included on the HostKing plan before relying on
+  this doc — if it isn't, those two steps need a different plan (e.g. a
+  support ticket asking HostKing to run them, or temporarily enabling
+  `INITIAL_ADMIN_*` env vars for step 6 instead of the CLI script).
 - The `quotes@kingdom-thread-co.co.za` mailbox — this is already the live
   production mailbox in use (confirmed working for both SMTP send and IMAP
   read via `cyclops.hkdns.host`); see the Known Gotchas section for the
@@ -60,9 +78,10 @@ HostKing's env var UI / a server-side `.env` file (also never committed).
 
 ## 1. Provision MySQL — start empty, no dev data
 
-Create a **new, empty** database and a scoped user via cPanel (not the
-account's root MySQL user — same pattern as the local dev setup in
-`DEV_CREDENTIALS.md`). Note host/port/db/user/password for step 2.
+Create a **new, empty** database and a scoped user via DirectAdmin's MySQL
+Management (not the account's root MySQL user — same pattern as the local
+dev setup in `DEV_CREDENTIALS.md`). Note host/port/db/user/password for
+step 2.
 
 **Do not dump/import the dev database.** The dev database has real test
 quotes, orders, messages, and accounts accumulated from testing — none of
@@ -80,7 +99,8 @@ deliberately, also step 6b.
 
 Both `.env` (root) and `server/.env` are gitignored — they never deploy via
 git and must be created directly on HostKing, either as files (SFTP/File
-Manager) or through the Node app's environment-variable UI in cPanel.
+Manager) or through the Node app's environment-variable UI in DirectAdmin's
+Node.js Selector.
 
 **Do not reuse your local dev `.env` files wholesale.** They currently point
 at a LAN IP (`192.168.2.251`) from device testing, and dev's `NODE_ENV` is
@@ -117,24 +137,34 @@ Root `.env` (used only at frontend build time, not deployed):
   baked into the static JS bundle at build time in step 7, so it must be
   correct *before* running `npm run build`.
 
-## 3. Deploy the backend (cPanel → Setup Node.js App)
+## 3. Deploy the backend (DirectAdmin → Node.js Selector / Setup Node.js App)
 
 - Application root: the `server/` directory of this repo, uploaded to
-  HostKing (via git pull on the server, SFTP, or cPanel's Git Version
-  Control feature).
-- Application URL: a subdomain (e.g. `api.kingdom-thread-co.co.za`) — cPanel
-  wires up the reverse proxy for you.
+  HostKing. DirectAdmin's Node.js Selector has no built-in Git deployment
+  feature (unlike cPanel) — get the files there via SFTP/File Manager, or
+  `git pull` over SSH if SSH access is available (see Prerequisites).
+  **Don't place it under `public_html`** — DirectAdmin's Node.js Selector
+  expects the app root outside the regular web-servable document root
+  (typically something like `~/domains/kingdom-thread-co.co.za/app/` or
+  similar — the exact path is proposed by the Selector itself when you
+  create the application).
+- Application URL: a subdomain (e.g. `api.kingdom-thread-co.co.za`) —
+  DirectAdmin wires up the reverse proxy for you.
 - Application startup file: `src/server.js`.
 - Node version: ≥ 18.
-- Run "NPM Install" through the cPanel UI (or `npm install` via its
-  terminal) to install `server/package.json` dependencies.
-- Set the env vars from step 2 through cPanel's Node app environment
-  variables UI, or ensure `server/.env` is present in the app root (either
-  works — `server/src/config/env.js` reads via `dotenv`).
+- Use the Node.js Selector's "Run NPM Install" button to install
+  `server/package.json` dependencies — this is the one arbitrary-ish
+  command it does provide; everything else needs SSH (see Prerequisites).
+- Set the env vars from step 2 through DirectAdmin's Node.js Selector
+  environment variables UI, or ensure `server/.env` is present in the app
+  root (either works — `server/src/config/env.js` reads via `dotenv`).
 
 ## 4. Run database migrations
 
-From the app's terminal (cPanel Terminal or SSH), inside `server/`:
+Over SSH (see Prerequisites — DirectAdmin has no browser terminal), inside
+`server/`, having activated the Node.js Selector's virtual environment
+(the Selector's app page shows the exact `source .../bin/activate`-style
+command for this app):
 
 ```
 npx knex migrate:latest
@@ -164,7 +194,8 @@ Two options — pick one:
   `server/src/lib/bootstrapAdmin.js`) and is permanently inert afterward,
   even if left set. Recommended to remove these three vars after confirming
   you can log in, as a precaution.
-- **Manual**: from the app's terminal, inside `server/`:
+- **Manual**: over SSH, inside `server/` (same virtual-environment caveat
+  as step 4):
   ```
   npm run create-admin -- --email=you@kingdom-thread-co.co.za --password=... --name="Your Name"
   ```
@@ -215,17 +246,19 @@ npm run build
 ```
 
 Upload the contents of the resulting `dist/` to the document root for
-`kingdom-thread-co.co.za` (cPanel File Manager or SFTP). This is a fully
+`kingdom-thread-co.co.za` (DirectAdmin File Manager or SFTP — this is
+`public_html`, unlike the backend's app root in step 3). This is a fully
 static deploy — no Node process runs for the frontend itself.
 
 ## 8. SSL
 
-Enable AutoSSL (or your preferred cert) on **both** `kingdom-thread-co.co.za`
-and the API subdomain. Required, not optional — the session cookie sets
-`secure: true` whenever `NODE_ENV=production` (`server/src/middleware/session.js`),
-so login/session cookies are silently dropped over plain HTTP.
+Enable a free Let's Encrypt certificate (DirectAdmin → SSL Certificates) —
+or your preferred cert — on **both** `kingdom-thread-co.co.za` and the API
+subdomain. Required, not optional — the session cookie sets `secure: true`
+whenever `NODE_ENV=production` (`server/src/middleware/session.js`), so
+login/session cookies are silently dropped over plain HTTP.
 
-## 9. Cron jobs (cPanel → Cron Jobs)
+## 9. Cron jobs (DirectAdmin → Cron Jobs)
 
 Add two jobs, both `cd`'d into the deployed `server/` directory first:
 
@@ -241,9 +274,10 @@ for this exact on-demand-hosting reason).
 ## 10. Verify
 
 - `GET https://<api-subdomain>/api/health` → `{ "ok": true }`
-- Confirm the database really is empty of dev data — from the app's MySQL
-  terminal: `SELECT COUNT(*) FROM quotes;` / `orders;` / `users;` should be
-  `0` (aside from the one admin from step 6).
+- Confirm the database really is empty of dev data — via DirectAdmin's
+  phpMyAdmin (under MySQL Management) or the `mysql` CLI over SSH:
+  `SELECT COUNT(*) FROM quotes;` / `orders;` / `users;` should be `0`
+  (aside from the one admin from step 6).
 - Confirm the catalogue loads: `GET https://<api-subdomain>/api/products`
   and `/api/categories` return the real shared NocoDB data, not empty lists
   (a broken `NOCODB_*` value is the usual cause if empty).
@@ -273,9 +307,15 @@ for this exact on-demand-hosting reason).
   has the same cap before launch — quote confirmation + notification + reply
   emails add up fast under real usage.
 - **No persistent process**: don't add `setInterval`/background loops to
-  the Express app expecting them to survive — HostKing's Node hosting can
-  restart the process between requests. Anything recurring belongs in
-  `server/scripts/cron/`, triggered by a HostKing cron job (see step 9).
+  the Express app expecting them to survive — HostKing's Passenger-managed
+  Node hosting (via DirectAdmin's Node.js Selector) can restart the process
+  between requests. Anything recurring belongs in `server/scripts/cron/`,
+  triggered by a HostKing cron job (see step 9).
+- **No browser terminal or arbitrary command runner**: unlike cPanel,
+  DirectAdmin's Node.js Selector can't run a one-off command beyond its own
+  "Run NPM Install" button — steps 4 and 6 need real SSH access. Confirm
+  this is available on the HostKing plan well before deploy day, not while
+  mid-deploy.
 - **Shared catalogue, no staging**: because dev and prod point at the same
   NocoDB instance/base, a product/category edit made from the dev admin UI
   is live on production immediately, and vice versa. There is currently no
