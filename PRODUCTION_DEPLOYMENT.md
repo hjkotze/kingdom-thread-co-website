@@ -100,9 +100,14 @@ deliberately, also step 6b.
 ## 2. Write the production env files (do this on the server, not by copying dev files)
 
 Both `.env` (root) and `server/.env` are gitignored — they never deploy via
-git and must be created directly on HostKing, either as files (SFTP/File
-Manager) or through the Node app's environment-variable UI in DirectAdmin's
-Node.js Selector.
+git and must be created directly on HostKing. **Use a `server/.env` file**
+(SFTP/File Manager), not DirectAdmin's Node.js Selector environment-variable
+UI — this app needs ~20 vars, which is tedious and typo-prone to enter one
+field at a time in that UI, and some Node.js Selector implementations only
+apply changed env vars on the app's next explicit Restart, an easy step to
+forget. A file is also exactly the same `dotenv`-loading path already
+proven working in dev. Lock down its permissions once it's in place
+(`chmod 600 server/.env`) so it's readable only by the app's own user.
 
 **Do not reuse your local dev `.env` files wholesale.** They currently point
 at a LAN IP (`192.168.2.251`) from device testing, and dev's `NODE_ENV` is
@@ -156,9 +161,9 @@ Root `.env` (used only at frontend build time, not deployed):
 - Use the Node.js Selector's "Run NPM Install" button to install
   `server/package.json` dependencies — this is the one arbitrary-ish
   command it does provide; everything else needs SSH (see Prerequisites).
-- Set the env vars from step 2 through DirectAdmin's Node.js Selector
-  environment variables UI, or ensure `server/.env` is present in the app
-  root (either works — `server/src/config/env.js` reads via `dotenv`).
+- Confirm the `server/.env` file from step 2 is present in the app root —
+  `server/src/config/env.js` reads it via `dotenv` on boot, no further
+  action needed here beyond making sure it's actually there.
 
 ## 4. Run database migrations
 
