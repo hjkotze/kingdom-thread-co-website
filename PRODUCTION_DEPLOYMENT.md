@@ -73,10 +73,17 @@ UI / a server-side `.env` file (also never committed).
   same base, see Architecture recap above).
 - A generated `SESSION_SECRET` (`openssl rand -hex 32`) — do **not** reuse
   the dev value.
-- Your local branch committed and pushed, and confirmation of exactly which
-  commit is being deployed (`git log -1`) — check `git status` before
-  starting; uncommitted local work won't be on the server no matter how it's
-  deployed.
+- Your local branch committed and pushed. On your local machine, from the
+  repo root, run:
+  ```
+  git status
+  git log -1
+  ```
+  `git status` must show a clean working tree (no "Changes not staged" /
+  "Untracked files" you need) — uncommitted local work never reaches the
+  server no matter which deploy method you use below. `git log -1` shows
+  the exact commit hash you're about to deploy; note it down so you can
+  confirm the server ends up on the same commit.
 
 ## 1. Provision MySQL — start empty, no dev data
 
@@ -97,17 +104,22 @@ from the NocoDB-hosted catalogue (see Architecture recap); anything still
 empty after migrations (just site turnaround text) needs to be re-entered
 deliberately, also step 6b.
 
-## 2. Write the production env files (do this on the server, not by copying dev files)
+## 2. Write the production env files (write fresh values, don't copy dev's file as-is)
 
 Both `.env` (root) and `server/.env` are gitignored — they never deploy via
-git and must be created directly on HostKing. **Use a `server/.env` file**
-(SFTP/File Manager), not DirectAdmin's Node.js Selector environment-variable
-UI — this app needs ~20 vars, which is tedious and typo-prone to enter one
-field at a time in that UI, and some Node.js Selector implementations only
-apply changed env vars on the app's next explicit Restart, an easy step to
+git, so they have to reach HostKing some other way. **Use a `server/.env`
+file**, not DirectAdmin's Node.js Selector environment-variable UI — this
+app needs ~20 vars, which is tedious and typo-prone to enter one field at a
+time in that UI, and some Node.js Selector implementations only apply
+changed env vars on the app's next explicit Restart, an easy step to
 forget. A file is also exactly the same `dotenv`-loading path already
-proven working in dev. Lock down its permissions once it's in place
-(`chmod 600 server/.env`) so it's readable only by the app's own user.
+proven working in dev. It's easiest to draft this file locally (a text
+editor, using `server/.env.example` as the template) and then upload it via
+SFTP/File Manager directly into the Application root you'll set up in step
+3 — or create/edit it directly on the server through File Manager's editor
+if you prefer, either is fine. Once it's in place, lock down its
+permissions: over SSH, `chmod 600 server/.env` (run from inside the
+Application root) so it's readable only by the app's own user.
 
 **Do not reuse your local dev `.env` files wholesale.** They currently point
 at a LAN IP (`192.168.2.251`) from device testing, and dev's `NODE_ENV` is
@@ -145,32 +157,74 @@ Root `.env` (used only at frontend build time, not deployed):
 
 ## 3. Deploy the backend (DirectAdmin → Node.js Selector / Setup Node.js App)
 
-- Application root: the `server/` directory of this repo, uploaded to
-  HostKing. DirectAdmin's Node.js Selector has no built-in Git deployment
-  feature (unlike cPanel) — get the files there via SFTP/File Manager, or
-  `git pull` over SSH if SSH access is available (see Prerequisites).
-  **Don't place it under `public_html`** — DirectAdmin's Node.js Selector
-  expects the app root outside the regular web-servable document root
-  (typically something like `~/domains/kingdom-thread-co.co.za/app/` or
-  similar — the exact path is proposed by the Selector itself when you
-  create the application).
-- Application URL: `api.kingdom-thread-co.co.za` — DirectAdmin wires up
-  the reverse proxy for you.
-- Application startup file: `src/server.js`.
+**First, get the whole repo onto the server** (not just `server/` — the
+Node app's root will point at the `server/` subfolder within it, so the
+rest of the repo can sit alongside it unused by the backend). Two ways:
+
+- **SFTP/File Manager**: upload the entire repo into a folder in your
+  home directory, e.g. `~/repo/` (so the backend ends up at
+  `~/repo/server/`).
+- **Git, over SSH** (needs SSH access — see Prerequisites):
+  ```
+  git clone https://github.com/hjkotze/kingdom-thread-co-website.git ~/repo
+  ```
+  For a later redeploy of a newer commit, instead of cloning again:
+  ```
+  cd ~/repo && git pull
+  ```
+
+**Then create the Node.js app** in DirectAdmin's Selector with:
+
+- Application URL: `api.kingdom-thread-co.co.za`.
+- Application root: **use whatever path the Selector proposes or requires
+  for this Application URL — don't override it with a custom path unless
+  you have a specific reason to.** DirectAdmin's Node.js Selector is known
+  to tie an app's root to the target domain/subdomain's own document root
+  (in this case, whatever you set as `api.kingdom-thread-co.co.za`'s
+  document root when creating the subdomain — e.g.
+  `~/domains/api.kingdom-thread-co.co.za/public_html` if you went with the
+  Default option). This doc can't tell you the exact value with certainty
+  without seeing your live panel — treat the value the Selector shows/fills
+  in for you as authoritative. Whatever that path turns out to be, `git
+  clone`/upload the **contents of this repo's `server/` folder** directly
+  into it (so `package.json` and `src/` sit directly inside the Application
+  root, not nested one level down inside a `server/` subfolder) — this is
+  different from the `~/repo` clone location suggested above, which is a
+  convenient staging spot you can `git pull` into and then copy/symlink
+  from, not necessarily the Application root itself.
+- Application startup file: `src/server.js`, relative to whatever the
+  Application root ends up being.
 - Node version: ≥ 18.
 - Use the Node.js Selector's "Run NPM Install" button to install
   `server/package.json` dependencies — this is the one arbitrary-ish
   command it does provide; everything else needs SSH (see Prerequisites).
-- Confirm the `server/.env` file from step 2 is present in the app root —
-  `server/src/config/env.js` reads it via `dotenv` on boot, no further
-  action needed here beyond making sure it's actually there.
+- Confirm the `server/.env` file from step 2 is present directly inside
+  the application root — `server/src/config/env.js` reads it via `dotenv`
+  on boot, no further action needed here beyond making sure it's actually
+  there.
+
+This means the Application root and the subdomain's document root may
+turn out to be **the same directory** — that's expected here, not a
+mistake, since this subdomain exists solely to host the API and serves no
+separate static content of its own. (Contrast with the frontend in step 7:
+`kingdom-thread-co.co.za`'s own `public_html` genuinely is shared/static,
+which is why the backend must never be placed there instead.)
 
 ## 4. Run database migrations
 
-Over SSH (see Prerequisites — DirectAdmin has no browser terminal), inside
-`server/`, having activated the Node.js Selector's virtual environment
-(the Selector's app page shows the exact `source .../bin/activate`-style
-command for this app):
+Over SSH (see Prerequisites — DirectAdmin has no browser terminal). First
+`cd` into the Application root from step 3, then activate the Node.js
+Selector's virtual environment — the Selector's app management page shows
+an exact command for this specific app, something like:
+
+```
+source /home/<youraccount>/nodevenv/domains/api.kingdom-thread-co.co.za/<path>/18/bin/activate && cd /home/<youraccount>/domains/api.kingdom-thread-co.co.za/<path>
+```
+
+Copy and run that exact line as shown on the Selector's page (the
+`<youraccount>`/`<path>` placeholders above are illustrative — the real
+command it gives you already has your actual paths filled in and already
+`cd`s you to the right place). Then run:
 
 ```
 npx knex migrate:latest
@@ -200,11 +254,13 @@ Two options — pick one:
   `server/src/lib/bootstrapAdmin.js`) and is permanently inert afterward,
   even if left set. Recommended to remove these three vars after confirming
   you can log in, as a precaution.
-- **Manual**: over SSH, inside `server/` (same virtual-environment caveat
-  as step 4):
+- **Manual**: over SSH, same virtual-environment activation step as step 4
+  first, then from the Application root:
   ```
-  npm run create-admin -- --email=you@kingdom-thread-co.co.za --password=... --name="Your Name"
+  npm run create-admin -- --email=you@kingdom-thread-co.co.za --password=YourRealPasswordHere --name="Your Name"
   ```
+  (replace the email/password/name with the real admin's — the values here
+  are placeholders, not literal values to paste in as-is)
 
 There is no self-service admin registration endpoint by design — this is
 the only way to create one.
@@ -245,7 +301,10 @@ before taking real orders, at `/admin/configuration/settings`:
 
 ## 7. Build and deploy the frontend
 
-From the repo root, with the production `VITE_API_URL` set (step 2):
+**Run this on your local machine, not the server** — HostKing never needs
+the frontend's source or `node_modules`, only the static output. From the
+repo root locally, with the production `VITE_API_URL` set in the root
+`.env` (step 2):
 
 ```
 npm run build
@@ -266,16 +325,38 @@ login/session cookies are silently dropped over plain HTTP.
 
 ## 9. Cron jobs (DirectAdmin → Cron Jobs)
 
-Add two jobs, both `cd`'d into the deployed `server/` directory first:
+Add two jobs. **A cron job's command field is a single, standalone shell
+command** — it does not inherit any directory or environment from step 4,
+and cron's own `PATH` typically does not include the Selector-managed
+`node` binary, only whatever system Node (if any) is installed. Each
+command below must therefore include the same virtual-environment
+activation line from step 4, then `cd` into the Application root, then run
+the script — all chained with `&&` into one line, since each cron command
+runs fresh:
 
-| Script | Suggested schedule | Purpose |
+```
+source /home/<youraccount>/nodevenv/domains/api.kingdom-thread-co.co.za/<path>/18/bin/activate && cd /home/<youraccount>/domains/api.kingdom-thread-co.co.za/<path> && node scripts/cron/ingest-emails.js
+```
+
+```
+source /home/<youraccount>/nodevenv/domains/api.kingdom-thread-co.co.za/<path>/18/bin/activate && cd /home/<youraccount>/domains/api.kingdom-thread-co.co.za/<path> && node scripts/cron/cleanup-sessions.js
+```
+
+(again, replace the `<youraccount>`/`<path>` placeholders with the real
+activation command from the Selector's app page, same as step 4 — don't
+paste the template above verbatim.)
+
+| Command (schematic — see full command above) | Suggested schedule | Purpose |
 |---|---|---|
-| `node scripts/cron/ingest-emails.js` | every 5–15 min | Pull customer email replies into quote threads |
-| `node scripts/cron/cleanup-sessions.js` | daily | Delete expired session rows |
+| `... && node scripts/cron/ingest-emails.js` | every 5–15 min | Pull customer email replies into quote threads |
+| `... && node scripts/cron/cleanup-sessions.js` | daily | Delete expired session rows |
 
 Without these, email replies never get matched to quotes, and the sessions
 table grows unbounded (its own in-process cleanup is deliberately disabled
-for this exact on-demand-hosting reason).
+for this exact on-demand-hosting reason). If a cron job silently does
+nothing, suspect the activation line first — a bare `node scripts/...`
+with no activation will typically fail with "command not found" if there's
+no system-wide Node install, since cron won't see the Selector's version.
 
 ## 10. Verify
 
