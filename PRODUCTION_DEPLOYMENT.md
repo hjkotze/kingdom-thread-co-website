@@ -68,9 +68,13 @@ account's root MySQL user — same pattern as the local dev setup in
 quotes, orders, messages, and accounts accumulated from testing — none of
 that belongs in production. Step 4 (`knex migrate:latest`) creates every
 table from scratch, empty, on this new database — that's the entire "data
-migration" this deploy needs. The only things production and dev share are
-the NocoDB-hosted catalogue (see Architecture recap) and whatever real
-content you deliberately re-enter in step 6b.
+migration" this deploy needs. Three exceptions are seeded automatically by
+that same migration run (the current VAT rate, shipping rates, and the
+Privacy/Cookie Policy text — see step 6b) since those are real business
+content, not test data. Everything else production and dev share comes
+from the NocoDB-hosted catalogue (see Architecture recap); anything still
+empty after migrations (just site turnaround text) needs to be re-entered
+deliberately, also step 6b.
 
 ## 2. Write the production env files (do this on the server, not by copying dev files)
 
@@ -168,29 +172,39 @@ Two options — pick one:
 There is no self-service admin registration endpoint by design — this is
 the only way to create one.
 
-## 6b. Configure business settings (required — these do NOT come from NocoDB or from migrations)
+## 6b. Confirm business settings (VAT, shipping, and policies are seeded automatically)
 
-A handful of settings live in MySQL, not NocoDB, and a fresh migration
-creates their tables **empty** (not seeded with dev's values). Log in as the
-admin from step 6 and fill these in at `/admin/configuration/settings`
-before taking real orders:
+A handful of settings live in MySQL, not NocoDB, and would otherwise leave
+their tables **empty** (breaking checkout or leaving legal pages blank) on
+a fresh deploy. Two migrations seed real current values for these as part
+of step 4 (`knex migrate:latest`) — no manual entry needed for any of them:
 
-- **VAT rate** — genuinely required, not optional: `vat_rates` starts with
-  zero rows, and any order/invoice pricing calculation will fail with a
-  500 ("No VAT rate configured for this date") until at least one rate is
-  added.
-- **Shipping rates** — `shipping_rates` also starts empty. Not fatal like
-  VAT (the app falls back to no shipping cost if none is set), but pricing
-  will be wrong until at least a default rate exists.
+- **VAT rate** (`20260819100001_seed_vat_rate_and_policy_content.js`) —
+  seeded at 15% (South Africa's current rate as of this writing). Without
+  this, `vat_rates` starts with zero rows and any order/invoice pricing
+  calculation fails with a 500 ("No VAT rate configured for this date"). If
+  the real rate ever changes, add a new rate from
+  `/admin/configuration/settings` rather than editing this migration — same
+  effective-dating the app already uses for rate changes.
+- **Shipping rates** (`20260819100002_seed_shipping_rates.js`) — seeded
+  with the two rates currently configured in dev ("Extra freight" R300,
+  "FREIGHT" R150 default). Edit or add more from
+  `/admin/configuration/settings` as needed.
+- **Privacy Policy / Cookie Policy** (also in
+  `20260819100001_seed_vat_rate_and_policy_content.js`) — seeded with the
+  real current text at `/admin/configuration/privacy-policy` and
+  `/admin/configuration/cookie-policy`.
+
+All three seed migrations only insert when their table is empty (or, for
+policies, when content is still `null`) — safe to run against dev's
+existing database (confirmed: no-op, no duplicates) and will never
+overwrite an admin edit made before a later deploy.
+
+Still genuinely empty after migrations and worth setting deliberately
+before taking real orders, at `/admin/configuration/settings`:
+
 - **Site turnaround text** — has an app-level fallback ("7-10") if never
   set, so this one is cosmetic-only, but worth setting deliberately.
-
-Also at `/admin/configuration/privacy-policy` and
-`/admin/configuration/cookie-policy`: the `policies` table is seeded with
-`content: null` for both on a fresh migration — the public policy pages
-will render empty until real text is entered. This is legal-facing content,
-not test data, so it needs to be typed in fresh (or copied in) rather than
-inherited from anywhere automatically.
 
 ## 7. Build and deploy the frontend
 
@@ -269,8 +283,9 @@ for this exact on-demand-hosting reason).
 
 ## Pre-launch content checklist (unrelated to infra, but easy to miss)
 
-- VAT rate, shipping rates, and Privacy/Cookie Policy text are configured
-  (step 6b) — not optional, checkout will error without at least a VAT rate.
+- VAT rate, shipping rates, and Privacy/Cookie Policy text are all seeded
+  automatically by migrations (step 6b) — just confirm they're actually
+  correct for launch, since "seeded" isn't the same as "reviewed."
 - Double check no dev/test accounts (`admin@wovenblankets.test`,
   `jane@example.com`, etc. — see `DEV_CREDENTIALS.md`) exist in the
   production database — they won't, if step 1 was followed (fresh database,
