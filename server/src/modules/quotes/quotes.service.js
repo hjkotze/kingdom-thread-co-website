@@ -37,10 +37,16 @@ async function validateAndBuildQuoteInput(input) {
     throw new ValidationError("Quantity must be a positive whole number.");
   }
 
+  // product.price is a "from" display price (the cheapest size, for a
+  // product with per-size pricing) — the actual quote must snapshot the
+  // price for the size the customer picked, not that display price.
+  const sizePrice = product.sizePrices?.[size];
+  const priceSnapshot = typeof sizePrice === "number" && !Number.isNaN(sizePrice) ? sizePrice : product.price;
+
   const result = {
     productAirtableId: product.id,
     productNameSnapshot: product.name,
-    priceSnapshot: product.price,
+    priceSnapshot,
     customisableSnapshot: product.customisable,
     size,
     colour,

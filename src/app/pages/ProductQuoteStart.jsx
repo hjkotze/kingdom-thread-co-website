@@ -46,6 +46,12 @@ export default function ProductQuoteStart() {
     navigate(product.customisable ? `/quote/${productId}/customise` : "/quote/review");
   };
 
+  // product.price is a "from" display price (the cheapest size, when this
+  // product has per-size pricing) — once a size is actually picked, show
+  // what that size costs instead.
+  const sizePrice = product?.sizePrices?.[size];
+  const unitPrice = typeof sizePrice === "number" && !Number.isNaN(sizePrice) ? sizePrice : product?.price;
+
   if (loading) return null;
   if (notFound || !product) {
     return (
@@ -89,16 +95,16 @@ export default function ProductQuoteStart() {
           />
         </div>
 
-        {product.price !== null && (
+        {unitPrice !== null && unitPrice !== undefined && (
           <div className="flex justify-between text-sm border-t border-border pt-4">
             <div className="text-muted-foreground">
-              <p>Unit price</p>
+              <p>Unit price{size ? ` (${size})` : ""}</p>
               <p className="mt-1">Total</p>
             </div>
             <div className="text-right text-foreground">
-              <p>R{Number(product.price).toFixed(2)}</p>
+              <p>R{Number(unitPrice).toFixed(2)}</p>
               <p className="mt-1 font-medium">
-                R{(Number(product.price) * (Number(quantity) || 0)).toFixed(2)}
+                R{(Number(unitPrice) * (Number(quantity) || 0)).toFixed(2)}
               </p>
             </div>
           </div>

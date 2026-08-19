@@ -12,7 +12,15 @@ HostKing's env var UI / a server-side `.env` file (also never committed).
   server-side rendering — deploy the built files to static hosting.
 - **Backend**: an Express API (`server/`), deployed separately as a HostKing
   Node.js app (cPanel "Setup Node.js App", backed by Phusion Passenger).
-- **Database**: MySQL, provisioned through cPanel.
+- **Database**: MySQL, provisioned through cPanel. **A brand-new, empty
+  database** — production does not reuse or import the dev database. See
+  step 1.
+- **Product/category/thread-colour catalogue**: NocoDB, self-hosted at
+  `nocodb.khjimaging.com`. Production uses **the same NocoDB instance and
+  base as dev** — there is no separate production catalogue to provision or
+  seed. This means editing a product/category from either environment's
+  admin UI changes the same live data everywhere; there's no
+  staging/production split for catalogue content.
 - **HostKing Node hosting is on-demand — there is no long-lived process.**
   This is why the app uses cron scripts instead of in-process timers for
   anything recurring:
@@ -21,7 +29,7 @@ HostKing's env var UI / a server-side `.env` file (also never committed).
   - `server/scripts/cron/cleanup-sessions.js` — deletes expired session
     rows (the session store's own internal sweeper is disabled for the same
     reason — see `server/src/middleware/session.js`), run this daily.
-- **Product/category images** go straight to Airtable's attachment API — no
+- **Product/category images** go straight to NocoDB's attachment API — no
   local image storage to provision.
 - **Customer quote file uploads** (design files, wording docs) *are* stored
   on local disk, outside the web root (`UPLOADS_DIR`, defaults to
@@ -36,19 +44,33 @@ HostKing's env var UI / a server-side `.env` file (also never committed).
 - HostKing cPanel access with: MySQL database creation, "Setup Node.js App"
   (Node ≥ 18, matching `server/package.json` `engines`), Cron Jobs, and
   SSL/AutoSSL for both the main domain and whatever subdomain hosts the API.
-- The `kingdom-thread-co.co.za` mailbox already in use for
-  SMTP/IMAP (see the Known Gotchas section below before assuming
-  credentials that work in cPanel's mail UI will work as SMTP_HOST/IMAP_HOST).
-- Airtable base ID + API key for the live product/category/thread-colour
-  data (same base used in dev, or a production copy — your call).
+- The `quotes@kingdom-thread-co.co.za` mailbox — this is already the live
+  production mailbox in use (confirmed working for both SMTP send and IMAP
+  read via `cyclops.hkdns.host`); see the Known Gotchas section for the
+  hostname caveat.
+- The dev `NOCODB_BASE_URL` / `NOCODB_API_TOKEN` / `NOCODB_BASE_ID` values
+  from `server/.env` — copied as-is into production's env (same instance,
+  same base, see Architecture recap above).
 - A generated `SESSION_SECRET` (`openssl rand -hex 32`) — do **not** reuse
   the dev value.
+- Your local branch committed and pushed, and confirmation of exactly which
+  commit is being deployed (`git log -1`) — check `git status` before
+  starting; uncommitted local work won't be on the server no matter how it's
+  deployed.
 
-## 1. Provision MySQL
+## 1. Provision MySQL — start empty, no dev data
 
-Create a database and a scoped user via cPanel (not the account's root
-MySQL user — same pattern as the local dev setup in `DEV_CREDENTIALS.md`).
-Note host/port/db/user/password for step 2.
+Create a **new, empty** database and a scoped user via cPanel (not the
+account's root MySQL user — same pattern as the local dev setup in
+`DEV_CREDENTIALS.md`). Note host/port/db/user/password for step 2.
+
+**Do not dump/import the dev database.** The dev database has real test
+quotes, orders, messages, and accounts accumulated from testing — none of
+that belongs in production. Step 4 (`knex migrate:latest`) creates every
+table from scratch, empty, on this new database — that's the entire "data
+migration" this deploy needs. The only things production and dev share are
+the NocoDB-hosted catalogue (see Architecture recap) and whatever real
+content you deliberately re-enter in step 6b.
 
 ## 2. Write the production env files (do this on the server, not by copying dev files)
 
@@ -56,10 +78,9 @@ Both `.env` (root) and `server/.env` are gitignored — they never deploy via
 git and must be created directly on HostKing, either as files (SFTP/File
 Manager) or through the Node app's environment-variable UI in cPanel.
 
-**Do not reuse your local dev `.env` files as-is.** They currently point at
-a LAN IP (`192.168.2.251`) from device testing — see the "iPad testing"
-conversation in this repo's history if you need context. Production needs
-its own values:
+**Do not reuse your local dev `.env` files wholesale.** They currently point
+at a LAN IP (`192.168.2.251`) from device testing, and dev's `NODE_ENV` is
+`development`. Production needs its own values:
 
 `server/.env` — use `server/.env.example` as the template, with:
 - `NODE_ENV=production`
@@ -71,15 +92,18 @@ its own values:
   unnecessary in production.
 - `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` from step 1
 - `SESSION_SECRET` — the freshly generated value, not the dev placeholder
-- `AIRTABLE_API_KEY` / `AIRTABLE_BASE_ID` — production values
+- `NOCODB_BASE_URL` / `NOCODB_API_TOKEN` / `NOCODB_BASE_ID` — copied
+  directly from dev's `server/.env`, same values (see Prerequisites)
 - `UPLOADS_DIR` — an absolute path outside any web-servable document root
   (create this directory in step 5 if you set it explicitly)
 - `SMTP_HOST` / `IMAP_HOST` — **`cyclops.hkdns.host`, not
   `smtp.kingdom-thread-co.co.za`** (see Known Gotchas)
 - `SMTP_USER` / `SMTP_PASSWORD` / `IMAP_USER` / `IMAP_PASSWORD` — the
-  production mailbox credentials
-- `COMPANY_NOTIFICATION_EMAIL`, `MAIL_DOMAIN`, `IMAP_PROCESSED_FOLDER` as
-  needed (all have sane defaults — see `.env.example` comments)
+  `quotes@kingdom-thread-co.co.za` credentials
+- `COMPANY_NOTIFICATION_EMAIL=quotes@kingdom-thread-co.co.za`,
+  `MAIL_DOMAIN=kingdom-thread-co.co.za`, `IMAP_PROCESSED_FOLDER` as needed
+  (all but the mailbox itself have sane defaults — see `.env.example`
+  comments)
 - `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD` / `INITIAL_ADMIN_NAME` —
   set for the *first* boot only (see step 6), then remove
 
@@ -112,10 +136,11 @@ From the app's terminal (cPanel Terminal or SSH), inside `server/`:
 npx knex migrate:latest
 ```
 
-This runs all 19 migrations currently in `server/src/db/migrations/`,
-creating every table from scratch on a fresh database. Back up the database
-before running migrations on any *existing* production data in future
-deploys.
+This creates every table currently defined in
+`server/src/db/migrations/` from scratch, empty. Back up the production
+database before running migrations on any *existing* production data in
+future deploys (this first run is the exception — there's nothing to lose
+yet).
 
 ## 5. Create the uploads directory
 
@@ -142,6 +167,30 @@ Two options — pick one:
 
 There is no self-service admin registration endpoint by design — this is
 the only way to create one.
+
+## 6b. Configure business settings (required — these do NOT come from NocoDB or from migrations)
+
+A handful of settings live in MySQL, not NocoDB, and a fresh migration
+creates their tables **empty** (not seeded with dev's values). Log in as the
+admin from step 6 and fill these in at `/admin/configuration/settings`
+before taking real orders:
+
+- **VAT rate** — genuinely required, not optional: `vat_rates` starts with
+  zero rows, and any order/invoice pricing calculation will fail with a
+  500 ("No VAT rate configured for this date") until at least one rate is
+  added.
+- **Shipping rates** — `shipping_rates` also starts empty. Not fatal like
+  VAT (the app falls back to no shipping cost if none is set), but pricing
+  will be wrong until at least a default rate exists.
+- **Site turnaround text** — has an app-level fallback ("7-10") if never
+  set, so this one is cosmetic-only, but worth setting deliberately.
+
+Also at `/admin/configuration/privacy-policy` and
+`/admin/configuration/cookie-policy`: the `policies` table is seeded with
+`content: null` for both on a fresh migration — the public policy pages
+will render empty until real text is entered. This is legal-facing content,
+not test data, so it needs to be typed in fresh (or copied in) rather than
+inherited from anywhere automatically.
 
 ## 7. Build and deploy the frontend
 
@@ -178,11 +227,21 @@ for this exact on-demand-hosting reason).
 ## 10. Verify
 
 - `GET https://<api-subdomain>/api/health` → `{ "ok": true }`
-- Log in as the admin account created in step 6
-- Submit a test customer quote end-to-end, including a reply, and confirm
-  the notification/confirmation emails send and thread correctly
+- Confirm the database really is empty of dev data — from the app's MySQL
+  terminal: `SELECT COUNT(*) FROM quotes;` / `orders;` / `users;` should be
+  `0` (aside from the one admin from step 6).
+- Confirm the catalogue loads: `GET https://<api-subdomain>/api/products`
+  and `/api/categories` return the real shared NocoDB data, not empty lists
+  (a broken `NOCODB_*` value is the usual cause if empty).
+- Log in as the admin account created in step 6.
+- Submit a real test customer quote end-to-end, including a reply, and
+  confirm the notification/confirmation emails send and thread correctly.
+  Delete or ignore this test quote afterward — same "no dev data lingering"
+  principle as step 1.
+- Create a test order and confirm pricing (VAT + shipping) actually
+  computes rather than 500ing — proves step 6b was completed.
 - Confirm the admin dashboard's status/category tiles and quote list load
-  (`/admin`, `/admin/quotes`)
+  (`/admin`, `/admin/quotes`).
 
 ## Known gotchas
 
@@ -190,23 +249,32 @@ for this exact on-demand-hosting reason).
   `imap.kingdom-thread-co.co.za` fail TLS certificate validation on
   HostKing — the cert covers the shared server's real hostname,
   `cyclops.hkdns.host`, not the per-domain alias. Use `cyclops.hkdns.host`
-  for both `SMTP_HOST` and `IMAP_HOST`, same credentials otherwise. If email
-  stops working after switching to the production mailbox, check this
-  first before assuming credentials are wrong.
-- **Outbound email rate limit**: the mailbox used during development hit a
-  hard cap of **10 outbound emails/day**. Confirm whether the production
-  mailbox/plan has the same limit before launch — quote confirmation +
-  notification + reply emails add up fast under real usage.
+  for both `SMTP_HOST` and `IMAP_HOST`, same credentials otherwise. Already
+  confirmed working this way for `quotes@kingdom-thread-co.co.za` — if email
+  stops working after any future mailbox change, check this first before
+  assuming credentials are wrong.
+- **Outbound email rate limit**: the mailbox used during earlier development
+  (a different address on the same domain) hit a hard cap of **10 outbound
+  emails/day**. Confirm with HostKing whether `quotes@kingdom-thread-co.co.za`
+  has the same cap before launch — quote confirmation + notification + reply
+  emails add up fast under real usage.
 - **No persistent process**: don't add `setInterval`/background loops to
   the Express app expecting them to survive — HostKing's Node hosting can
   restart the process between requests. Anything recurring belongs in
   `server/scripts/cron/`, triggered by a HostKing cron job (see step 9).
+- **Shared catalogue, no staging**: because dev and prod point at the same
+  NocoDB instance/base, a product/category edit made from the dev admin UI
+  is live on production immediately, and vice versa. There is currently no
+  way to test a catalogue change in isolation before it's public.
 
 ## Pre-launch content checklist (unrelated to infra, but easy to miss)
 
-- The site currently displays placeholder branding — the header/footer
-  render "WOVEN", not "Kingdom Thread Co" (`src/app/components/Header.jsx`,
-  `Footer.jsx`). Confirm this is intentionally rebranded before going live.
+- VAT rate, shipping rates, and Privacy/Cookie Policy text are configured
+  (step 6b) — not optional, checkout will error without at least a VAT rate.
 - Double check no dev/test accounts (`admin@wovenblankets.test`,
   `jane@example.com`, etc. — see `DEV_CREDENTIALS.md`) exist in the
-  production database.
+  production database — they won't, if step 1 was followed (fresh database,
+  never imported from dev), but worth a final check if that step was ever
+  skipped.
+- Double check no leftover test quotes/orders from your own step 10
+  verification pass before calling it launched.

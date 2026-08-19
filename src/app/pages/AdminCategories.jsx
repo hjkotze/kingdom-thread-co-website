@@ -13,7 +13,7 @@ import {
 } from "../lib/api/adminCategories";
 import { ApiError } from "../lib/api/client";
 
-const emptyCategory = { slug: "", label: "", headline: "", body: "", callout: "", alt: "", sortOrder: 0 };
+const emptyCategory = { slug: "", label: "", headline: "", body: "", callout: "", alt: "", sortOrder: 0, active: true };
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
@@ -168,6 +168,14 @@ export default function AdminCategories() {
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
+                {!category.active && (
+                  <span
+                    className="text-xs px-3 py-1"
+                    style={{ borderRadius: "var(--radius)", background: "var(--secondary)", color: "var(--muted-foreground)" }}
+                  >
+                    Inactive
+                  </span>
+                )}
                 <button onClick={() => setEditingId(category.id)} className="text-xs text-accent font-medium">
                   Edit
                 </button>
@@ -194,6 +202,7 @@ function CategoryForm({ category, onSubmit, onCancel, submitting }) {
           callout: category.callout || "",
           alt: category.alt || "",
           sortOrder: category.sortOrder ?? 0,
+          active: category.active !== false,
         }
       : emptyCategory,
   );
@@ -201,6 +210,7 @@ function CategoryForm({ category, onSubmit, onCancel, submitting }) {
   const [pendingFiles, setPendingFiles] = useState([]);
 
   const set = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value }));
+  const setChecked = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.checked }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -237,6 +247,11 @@ function CategoryForm({ category, onSubmit, onCancel, submitting }) {
         <Field label="Image alt text" value={values.alt} onChange={set("alt")} />
       </div>
       <Field label="Sort order" type="number" value={values.sortOrder} onChange={set("sortOrder")} className="w-32" />
+
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input type="checkbox" checked={values.active} onChange={setChecked("active")} />
+        Active (visible on the site)
+      </label>
 
       <div className="flex gap-3">
         <button

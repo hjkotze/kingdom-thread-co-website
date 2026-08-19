@@ -153,19 +153,24 @@ function toAirtableShape(tableName, record) {
     const value = fields[fieldName];
     fields[fieldName] = Array.isArray(value) ? value.map((linked) => String(linked.id)) : [];
   }
-  // NocoDB attachment objects come back with `signedPath`/`path`, not a
-  // stable `url` (unlike Airtable) — firstAttachmentUrl() in
-  // products/categories.service.js reads .url, so derive one. signedPath
-  // is a ~2hr-expiring signed link; acceptable here because both
-  // getProducts()/getCategories() re-fetch live on every request (only the
-  // MySQL cache-fallback path, used when NocoDB is briefly unreachable, can
-  // ever serve a stale/expired one).
+  // NocoDB attachment objects carry a `url` alongside `signedPath`/`path` —
+  // but `url` is frozen at whatever it was when the attachment was last
+  // written (upload, or any updateRecord touching that field) and is NOT
+  // refreshed on read, while `signedPath` genuinely is re-signed on every
+  // request (confirmed directly: fetching the same record repeatedly shows
+  // signedPath's timestamp changing every time, url's never does). A
+  // multi-image record whose Image field hasn't been *written* in a while
+  // (no add/remove/reorder) can carry a `url` old enough to have expired
+  // even though every *read* has been "live" the whole time — always
+  // rebuild it from signedPath instead of trusting whatever NocoDB echoes
+  // back, so this can never go stale.
   for (const fieldName of attachmentFields) {
     const value = fields[fieldName];
     if (Array.isArray(value)) {
-      fields[fieldName] = value.map((att) =>
-        att.url ? att : { ...att, url: `${env.nocodb.baseUrl}/${att.signedPath || att.path}` },
-      );
+      fields[fieldName] = value.map((att) => ({
+        ...att,
+        url: `${env.nocodb.baseUrl}/${att.signedPath || att.path}`,
+      }));
     }
   }
   return { id: String(record.id), fields };

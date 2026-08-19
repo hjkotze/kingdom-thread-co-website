@@ -17,6 +17,7 @@ const emptyProduct = {
   badge: "",
   description: "",
   sizes: [],
+  sizePrices: {},
   colours: [],
   customisable: false,
   active: true,
@@ -40,6 +41,7 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
           badge: product.badge || "",
           description: product.description || "",
           sizes: product.sizes || [],
+          sizePrices: product.sizePrices || {},
           colours: product.colours || [],
           customisable: Boolean(product.customisable),
           active: product.active !== false,
@@ -51,6 +53,20 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
 
   const set = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value }));
   const setChecked = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.checked }));
+
+  // Keeps sizePrices in lockstep with the Sizes tag list — adding a size
+  // gives it a blank price to fill in, removing one drops its price so a
+  // stale entry never lingers for a size the product no longer has.
+  const handleSizesChange = (sizes) => {
+    setValues((v) => {
+      const sizePrices = {};
+      for (const size of sizes) sizePrices[size] = v.sizePrices[size] ?? "";
+      return { ...v, sizes, sizePrices };
+    });
+  };
+
+  const setSizePrice = (size) => (e) =>
+    setValues((v) => ({ ...v, sizePrices: { ...v.sizePrices, [size]: e.target.value } }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -107,7 +123,9 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
       </p>
 
       <div className="grid sm:grid-cols-2 gap-4 items-end">
-        <Field label="Price (R)" type="number" min={0} step="0.01" value={values.price} onChange={set("price")} />
+        {values.sizes.length === 0 && (
+          <Field label="Price (R)" type="number" min={0} step="0.01" value={values.price} onChange={set("price")} />
+        )}
         {product && (
           <div className="flex flex-col gap-1.5">
             <label className="text-sm text-foreground font-medium">Rating</label>
@@ -141,7 +159,29 @@ export default function ProductForm({ product, categories, onSubmit, onCancel, s
         />
       </div>
 
-      <TagListInput label="Sizes" values={values.sizes} onChange={(sizes) => setValues((v) => ({ ...v, sizes }))} placeholder="Type a size, press Enter" />
+      <TagListInput label="Sizes" values={values.sizes} onChange={handleSizesChange} placeholder="Type a size, press Enter" />
+      {values.sizes.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm text-foreground font-medium">Price per size (R)</label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {values.sizes.map((size) => (
+              <div key={size} className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground w-28 shrink-0 truncate">{size}</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  required
+                  value={values.sizePrices[size] ?? ""}
+                  onChange={setSizePrice(size)}
+                  className="bg-input-background border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full"
+                  style={{ borderRadius: "var(--radius)" }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <TagListInput label="Colours" values={values.colours} onChange={(colours) => setValues((v) => ({ ...v, colours }))} placeholder="Type a colour, press Enter" />
 
       <div className="flex gap-6">

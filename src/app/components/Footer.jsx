@@ -66,10 +66,10 @@ export default function Footer({ scrollTo }) {
             <ul className="flex flex-col gap-2">
               <li>
                 <a
-                  href="mailto:hello@kingdom-thread-co.co.za"
+                  href="mailto:information@kingdom-thread-co.co.za"
                   className="text-sm text-primary-foreground/60 hover:text-primary-foreground transition-colors"
                 >
-                  hello@kingdom-thread-co.co.za
+                  information@kingdom-thread-co.co.za
                 </a>
               </li>
               <li className="text-sm text-primary-foreground/60">

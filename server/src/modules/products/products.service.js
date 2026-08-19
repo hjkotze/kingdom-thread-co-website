@@ -20,6 +20,32 @@ function allAttachments(field) {
   return Array.isArray(field) ? field.map((a) => ({ id: a.id, url: a.url })) : [];
 }
 
+// Best-effort JSON parse — malformed/empty "Size Prices" just falls back to
+// no per-size pricing rather than throwing and taking the whole product
+// (and every product after it in the batch) down with it.
+function parseSizePrices(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// The single "Price" field is still what every existing display ("from
+// R{price}" on Shop/ProductCategories cards, the admin list) reads — for a
+// product with per-size pricing there's no one "the" price, so this derives
+// the cheapest size as the "from" price shown before a size is picked.
+// Falls back to the raw Price field for products with no sizes at all.
+function computeDisplayPrice(rawPrice, sizes, sizePrices) {
+  if (Array.isArray(sizes) && sizes.length > 0) {
+    const values = sizes.map((s) => sizePrices[s]).filter((v) => typeof v === "number" && !Number.isNaN(v));
+    if (values.length > 0) return Math.min(...values);
+  }
+  return rawPrice;
+}
+
 // categoriesById: Map<airtableId, {slug, label}> — resolved once per fetch
 // rather than per-record, since the catalogue is small enough that a
 // single categories read up front is cheaper than one per product.
@@ -28,6 +54,8 @@ function mapProductRecord(record, categoriesById) {
   const categoryLink = f["Category"];
   const categoryId = Array.isArray(categoryLink) && categoryLink.length > 0 ? categoryLink[0] : null;
   const category = categoryId ? categoriesById.get(categoryId) : null;
+  const sizes = f["Sizes"] || [];
+  const sizePrices = parseSizePrices(f["Size Prices"]);
   return {
     airtableId: record.id,
     name: f["Name"] || "",
@@ -35,7 +63,8 @@ function mapProductRecord(record, categoriesById) {
     categoryId,
     categorySlug: category?.slug || null,
     categoryLabel: category?.label || null,
-    price: typeof f["Price"] === "number" ? f["Price"] : null,
+    price: computeDisplayPrice(typeof f["Price"] === "number" ? f["Price"] : null, sizes, sizePrices),
+    sizePrices,
     tag: f["Tag"] || "",
     // Embroidered vs Sublimation — determines which of Font colour/Thread
     // colour the customise flow asks for (quotes.service.js,
@@ -48,7 +77,7 @@ function mapProductRecord(record, categoriesById) {
     imageFallbackColour: f["Image Fallback Colour"] || "",
     badge: f["Badge"] || null,
     description: f["Description"] || "",
-    sizes: f["Sizes"] || [],
+    sizes,
     colours: f["Colours"] || [],
     customisable: Boolean(f["Customisable"]),
     active: f["Active"] !== false,
@@ -104,6 +133,7 @@ async function writeThroughProductsCache(products) {
         badge: p.badge,
         description: p.description,
         sizes: JSON.stringify(p.sizes),
+        size_prices: JSON.stringify(p.sizePrices),
         colours: JSON.stringify(p.colours),
         customisable: p.customisable,
         active: p.active,
@@ -130,6 +160,7 @@ function productRowToPublic(row) {
     badge: row.badge,
     description: row.description,
     sizes: typeof row.sizes === "string" ? JSON.parse(row.sizes) : row.sizes || [],
+    sizePrices: typeof row.size_prices === "string" ? JSON.parse(row.size_prices) : row.size_prices || {},
     colours: typeof row.colours === "string" ? JSON.parse(row.colours) : row.colours || [],
     customisable: Boolean(row.customisable),
   };
@@ -153,6 +184,7 @@ function productToPublic(p) {
     badge: p.badge,
     description: p.description,
     sizes: p.sizes,
+    sizePrices: p.sizePrices,
     colours: p.colours,
     customisable: p.customisable,
     active: p.active,
@@ -201,7 +233,7 @@ async function getProductByIdForAdmin(id) {
 
 const PRINTING_METHODS = ["Embroidered", "Sublimation"];
 
-async function validateProductInput({ name, categoryId, sizes, colours, price, printingMethod }) {
+async function validateProductInput({ name, categoryId, sizes, colours, price, sizePrices, printingMethod }) {
   if (!name || !name.trim()) throw new ProductAdminError("Name is required.", 400);
   if (!categoryId) throw new ProductAdminError("Category is required.", 400);
   const category = await categoriesService.getCategoryByIdForAdmin(categoryId);
@@ -209,11 +241,23 @@ async function validateProductInput({ name, categoryId, sizes, colours, price, p
   if (!printingMethod || !PRINTING_METHODS.includes(printingMethod)) {
     throw new ProductAdminError(`Printing method must be one of: ${PRINTING_METHODS.join(", ")}`, 400);
   }
-  if (price !== undefined && price !== null && price !== "" && (isNaN(Number(price)) || Number(price) < 0)) {
-    throw new ProductAdminError("Price must be a non-negative number.", 400);
-  }
   if (sizes !== undefined && !Array.isArray(sizes)) throw new ProductAdminError("Sizes must be a list.", 400);
   if (colours !== undefined && !Array.isArray(colours)) throw new ProductAdminError("Colours must be a list.", 400);
+
+  // A product with sizes has no single "the" price, so each size needs its
+  // own — otherwise a customer picking, say, "Queen" would silently be
+  // quoted whatever flat Price happened to be set (or nothing at all).
+  // Products with no sizes keep using the plain Price field, unchanged.
+  if (Array.isArray(sizes) && sizes.length > 0) {
+    for (const size of sizes) {
+      const value = sizePrices?.[size];
+      if (value === undefined || value === null || value === "" || isNaN(Number(value)) || Number(value) < 0) {
+        throw new ProductAdminError(`Price is required for size "${size}".`, 400);
+      }
+    }
+  } else if (price !== undefined && price !== null && price !== "" && (isNaN(Number(price)) || Number(price) < 0)) {
+    throw new ProductAdminError("Price must be a non-negative number.", 400);
+  }
 }
 
 // Rating/Reviews are deliberately absent — no longer app-writable at all,
@@ -230,21 +274,43 @@ function buildFields(input) {
     badge,
     description,
     sizes,
+    sizePrices,
     colours,
     customisable,
     active,
   } = input;
+  const sizesArr = sizes || [];
+  // Only keep entries for sizes the product actually has — a size removed
+  // from Sizes shouldn't leave its old price lingering in storage.
+  const cleanSizePrices = {};
+  for (const size of sizesArr) {
+    const value = sizePrices?.[size];
+    if (value !== undefined && value !== null && value !== "") cleanSizePrices[size] = Number(value);
+  }
+  const sizePriceValues = Object.values(cleanSizePrices);
+  // Price field doubles as the "from R" display price read everywhere else
+  // in the app — for a sized product that's the cheapest size, otherwise
+  // the plain admin-entered price.
+  const displayPrice =
+    sizesArr.length > 0
+      ? sizePriceValues.length > 0
+        ? Math.min(...sizePriceValues)
+        : null
+      : price === undefined || price === null || price === ""
+        ? null
+        : Number(price);
   return {
     Name: name.trim(),
     Subtitle: subtitle || "",
     Category: [categoryId],
-    Price: price === undefined || price === null || price === "" ? null : Number(price),
+    Price: displayPrice,
+    "Size Prices": sizesArr.length > 0 ? JSON.stringify(cleanSizePrices) : "",
     Tag: tag || "",
     "Printing Method": printingMethod,
     "Image Fallback Colour": imageFallbackColour || "",
     Badge: badge || "",
     Description: description || "",
-    Sizes: sizes || [],
+    Sizes: sizesArr,
     Colours: colours || [],
     Customisable: Boolean(customisable),
     Active: active === undefined ? true : Boolean(active),

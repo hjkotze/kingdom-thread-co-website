@@ -31,15 +31,21 @@ function mapCategoryRecord(record) {
     images: allAttachments(f["Image"]),
     alt: f["Alt"] || "",
     sortOrder: typeof f["Sort Order"] === "number" ? f["Sort Order"] : 0,
+    active: f["Active"] !== false,
     // Reverse link field, populated automatically by Airtable — read-only
     // here, informational only (shown in the admin category list).
     productIds: Array.isArray(f["Products"]) ? f["Products"] : [],
   };
 }
 
-async function fetchCategoriesLive() {
+async function fetchCategoriesLiveAll() {
   const records = await listAllRecords(TABLE, { sort: [{ field: "Sort Order" }] });
   return records.map(mapCategoryRecord);
+}
+
+async function fetchCategoriesLive() {
+  const all = await fetchCategoriesLiveAll();
+  return all.filter((category) => category.active);
 }
 
 async function writeThroughCache(categories) {
@@ -58,6 +64,7 @@ async function writeThroughCache(categories) {
         images: JSON.stringify(c.images),
         alt: c.alt,
         sort_order: c.sortOrder,
+        active: c.active,
         synced_at: now,
       })),
     );
@@ -89,11 +96,12 @@ function categoryToPublic(c) {
     images: c.images,
     alt: c.alt,
     sortOrder: c.sortOrder,
+    active: c.active,
   };
 }
 
 async function readCategoriesFromCache() {
-  const rows = await db("categories_cache").orderBy("sort_order", "asc");
+  const rows = await db("categories_cache").where({ active: true }).orderBy("sort_order", "asc");
   return rows.map(categoryRowToPublic);
 }
 
@@ -115,12 +123,12 @@ async function getCategories() {
 // transient Airtable outage should surface as an error here rather than
 // silently letting the admin edit against out-of-date data.
 async function listCategoriesForAdmin() {
-  const categories = await fetchCategoriesLive();
+  const categories = await fetchCategoriesLiveAll();
   return categories.map((c) => ({ ...categoryToPublic(c), productCount: c.productIds.length }));
 }
 
 async function getCategoryByIdForAdmin(id) {
-  const categories = await fetchCategoriesLive();
+  const categories = await fetchCategoriesLiveAll();
   const found = categories.find((c) => c.airtableId === id);
   if (!found) return null;
   return { ...categoryToPublic(found), productCount: found.productIds.length };
@@ -131,7 +139,7 @@ function validateCategoryInput({ slug, label }) {
   if (!label || !label.trim()) throw new CategoryError("Label is required.", 400);
 }
 
-function buildFields({ slug, label, headline, body, callout, alt, sortOrder }) {
+function buildFields({ slug, label, headline, body, callout, alt, sortOrder, active }) {
   return {
     Slug: slug.trim(),
     Label: label.trim(),
@@ -140,6 +148,7 @@ function buildFields({ slug, label, headline, body, callout, alt, sortOrder }) {
     Callout: callout || "",
     Alt: alt || "",
     "Sort Order": Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0,
+    Active: active === undefined ? true : Boolean(active),
   };
 }
 
