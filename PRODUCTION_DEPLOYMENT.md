@@ -52,8 +52,10 @@ UI / a server-side `.env` file (also never committed).
 - HostKing DirectAdmin access with: MySQL Management (database creation),
   Node.js Selector / "Setup Node.js App" (Node ≥ 18, matching
   `server/package.json` `engines`), Cron Jobs, and SSL Certificates
-  (Let's Encrypt) for both the main domain and whatever subdomain hosts
-  the API.
+  (Let's Encrypt) for both `kingdom-thread-co.co.za` and the
+  `api.kingdom-thread-co.co.za` subdomain (create this subdomain first if
+  it doesn't already exist — the backend Node.js app is hosted there,
+  separate from the frontend on the main domain).
 - **SSH access to the account.** DirectAdmin's Node.js Selector has no
   browser terminal and no "run an arbitrary command" box — beyond its own
   "Run NPM Install" button, it only starts/stops/restarts the app. Steps 4
@@ -132,10 +134,9 @@ at a LAN IP (`192.168.2.251`) from device testing, and dev's `NODE_ENV` is
   set for the *first* boot only (see step 6), then remove
 
 Root `.env` (used only at frontend build time, not deployed):
-- `VITE_API_URL=https://<api-subdomain>.kingdom-thread-co.co.za/api` (or
-  whatever URL the backend ends up reachable at — see step 3) — this gets
-  baked into the static JS bundle at build time in step 7, so it must be
-  correct *before* running `npm run build`.
+- `VITE_API_URL=https://api.kingdom-thread-co.co.za/api` — this gets baked
+  into the static JS bundle at build time in step 7, so it must be correct
+  *before* running `npm run build`.
 
 ## 3. Deploy the backend (DirectAdmin → Node.js Selector / Setup Node.js App)
 
@@ -148,8 +149,8 @@ Root `.env` (used only at frontend build time, not deployed):
   (typically something like `~/domains/kingdom-thread-co.co.za/app/` or
   similar — the exact path is proposed by the Selector itself when you
   create the application).
-- Application URL: a subdomain (e.g. `api.kingdom-thread-co.co.za`) —
-  DirectAdmin wires up the reverse proxy for you.
+- Application URL: `api.kingdom-thread-co.co.za` — DirectAdmin wires up
+  the reverse proxy for you.
 - Application startup file: `src/server.js`.
 - Node version: ≥ 18.
 - Use the Node.js Selector's "Run NPM Install" button to install
@@ -273,13 +274,14 @@ for this exact on-demand-hosting reason).
 
 ## 10. Verify
 
-- `GET https://<api-subdomain>/api/health` → `{ "ok": true }`
+- `GET https://api.kingdom-thread-co.co.za/api/health` → `{ "ok": true }`
 - Confirm the database really is empty of dev data — via DirectAdmin's
   phpMyAdmin (under MySQL Management) or the `mysql` CLI over SSH:
   `SELECT COUNT(*) FROM quotes;` / `orders;` / `users;` should be `0`
   (aside from the one admin from step 6).
-- Confirm the catalogue loads: `GET https://<api-subdomain>/api/products`
-  and `/api/categories` return the real shared NocoDB data, not empty lists
+- Confirm the catalogue loads:
+  `GET https://api.kingdom-thread-co.co.za/api/products` and
+  `/api/categories` return the real shared NocoDB data, not empty lists
   (a broken `NOCODB_*` value is the usual cause if empty).
 - Log in as the admin account created in step 6.
 - Submit a real test customer quote end-to-end, including a reply, and
