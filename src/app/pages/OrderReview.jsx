@@ -3,12 +3,16 @@ import { useNavigate, useSearchParams, Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { listEligibleOrders, createOrder } from "../lib/api/orders";
 import { ApiError } from "../lib/api/client";
+import { useAuth } from "../lib/auth/AuthContext";
+import { isCompleteAddress } from "../lib/isCompleteAddress";
 import Header from "../components/Header";
 
 export default function OrderReview() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const ids = searchParams.get("ids")?.split(",").map(Number).filter(Boolean) || [];
+  const addressMissing = !isCompleteAddress(user);
 
   const [lines, setLines] = useState(null);
   const [totals, setTotals] = useState(null);
@@ -76,6 +80,19 @@ export default function OrderReview() {
               ? "These requests will be billed as one order with a single shipping charge."
               : "Review the details below before accepting."}
           </p>
+
+          {addressMissing && (
+            <p
+              className="text-sm text-destructive bg-destructive/10 border border-destructive/30 px-4 py-2.5 mb-6"
+              style={{ borderRadius: "var(--radius)" }}
+            >
+              You'll need a delivery address on file before you can accept an order —{" "}
+              <Link to="/account/profile" className="font-medium underline">
+                add one to your profile
+              </Link>{" "}
+              first.
+            </p>
+          )}
 
           {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
@@ -154,7 +171,7 @@ export default function OrderReview() {
 
               <button
                 onClick={handleAccept}
-                disabled={submitting || lines.length === 0 || !agreedToPolicy}
+                disabled={submitting || lines.length === 0 || !agreedToPolicy || addressMissing}
                 className="bg-accent text-accent-foreground py-3.5 px-8 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
                 style={{ borderRadius: "var(--radius)" }}
               >

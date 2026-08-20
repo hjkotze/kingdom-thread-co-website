@@ -1,8 +1,14 @@
+import { useId } from "react";
+
 export default function AuthFormField({ label, type = "text", value, onChange, placeholder, required, autoComplete }) {
+  const id = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-foreground font-medium">{label}</label>
+      <label htmlFor={id} className="text-sm text-foreground font-medium">
+        {label}
+      </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={onChange}

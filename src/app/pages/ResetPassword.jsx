@@ -6,6 +6,7 @@ import { resetPassword } from "../lib/api/auth";
 import { ApiError } from "../lib/api/client";
 import AuthCard from "../components/auth/AuthCard";
 import AuthFormField from "../components/auth/AuthFormField";
+import { MIN_PASSWORD_LENGTH } from "../lib/passwordPolicy";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -63,7 +64,7 @@ export default function ResetPassword() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="At least 8 characters"
+          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
           autoComplete="new-password"
           required
         />

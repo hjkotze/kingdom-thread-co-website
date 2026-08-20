@@ -11,6 +11,7 @@ export default function Shop({
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,7 +22,14 @@ export default function Shop({
         setCategories(categoriesData.categories);
       })
       .catch(() => {
-        if (!cancelled) setProducts([]);
+        // Distinct from "there just aren't any products" — a fetch failure
+        // (NocoDB down, network issue) shouldn't render identically to a
+        // genuinely empty catalogue, which would read as "this store has
+        // nothing for sale" rather than "something broke."
+        if (!cancelled) {
+          setProducts([]);
+          setLoadError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -98,7 +106,12 @@ export default function Shop({
         {loading && (
           <p className="text-sm text-muted-foreground">Loading products…</p>
         )}
-        {!loading && filteredProducts.length === 0 && (
+        {!loading && loadError && (
+          <p className="text-sm text-destructive">
+            Couldn't load products — please try refreshing the page.
+          </p>
+        )}
+        {!loading && !loadError && filteredProducts.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No products found.
           </p>
