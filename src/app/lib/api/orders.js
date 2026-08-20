@@ -1,7 +1,8 @@
 import { apiFetch } from "./client";
 
-export function listEligibleOrders() {
-  return apiFetch("/account/orders/eligible");
+export function listEligibleOrders(ids) {
+  const query = ids && ids.length > 0 ? `?ids=${ids.join(",")}` : "";
+  return apiFetch(`/account/orders/eligible${query}`);
 }
 
 export function createOrder(quoteIds) {

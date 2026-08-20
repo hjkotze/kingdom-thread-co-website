@@ -4,6 +4,7 @@ const CONFIG_TABS = [
   { to: "/admin/configuration/settings", label: "Settings" },
   { to: "/admin/configuration/privacy-policy", label: "Privacy Policy" },
   { to: "/admin/configuration/cookie-policy", label: "Cookie Policy" },
+  { to: "/admin/configuration/returns-policy", label: "Returns & Cancellation" },
   { to: "/admin/configuration/categories", label: "Categories" },
   { to: "/admin/configuration/products", label: "Products" },
   { to: "/admin/configuration/thread-colours", label: "Thread Colours" },

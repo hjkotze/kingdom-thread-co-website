@@ -11,6 +11,7 @@ export default function OrderReview() {
   const ids = searchParams.get("ids")?.split(",").map(Number).filter(Boolean) || [];
 
   const [lines, setLines] = useState(null);
+  const [totals, setTotals] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -18,9 +19,17 @@ export default function OrderReview() {
 
   useEffect(() => {
     let cancelled = false;
-    listEligibleOrders()
+    listEligibleOrders(ids)
       .then((data) => {
-        if (!cancelled) setLines(data.lines.filter((l) => ids.includes(l.quoteId)));
+        if (cancelled) return;
+        setLines(data.lines);
+        setTotals({
+          subtotal: data.subtotal,
+          shippingAmount: data.shippingAmount,
+          vatRatePercent: data.vatRatePercent,
+          vatAmount: data.vatAmount,
+          total: data.total,
+        });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -33,7 +42,7 @@ export default function OrderReview() {
 
   const handleAccept = async () => {
     if (!agreedToPolicy) {
-      setError("Please agree to the Privacy Policy to continue.");
+      setError("Please agree to the Privacy Policy and Returns & Cancellation Policy to continue.");
       return;
     }
     setSubmitting(true);
@@ -46,8 +55,6 @@ export default function OrderReview() {
       setSubmitting(false);
     }
   };
-
-  const subtotal = (lines || []).reduce((sum, l) => sum + (l.amount || 0), 0);
 
   return (
     <>
@@ -90,15 +97,31 @@ export default function OrderReview() {
                     <p className="text-sm text-foreground shrink-0">R{(line.amount || 0).toFixed(2)}</p>
                   </div>
                 ))}
-                <div className="px-5 py-4 border-t border-border flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="text-foreground font-medium">R{subtotal.toFixed(2)}</span>
+                <div className="px-5 py-4 border-t border-border flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-foreground">R{(totals?.subtotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="text-foreground">R{(totals?.shippingAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      VAT{totals?.vatRatePercent !== null && totals?.vatRatePercent !== undefined ? ` (${totals.vatRatePercent}%)` : ""}
+                    </span>
+                    <span className="text-foreground">R{(totals?.vatAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-border">
+                    <span className="text-foreground font-medium">Total</span>
+                    <span className="text-foreground font-medium">R{(totals?.total || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
               <p className="text-xs text-muted-foreground mb-6">
-                Shipping and VAT are calculated on your invoice once accepted — combining reduces shipping to a
-                single charge for the whole order. Full payment is due on acceptance.
+                {ids.length > 1 ? "Combining reduces shipping to a single charge for the whole order. " : ""}
+                Full payment is due on acceptance.
               </p>
 
               {error && (
@@ -121,6 +144,10 @@ export default function OrderReview() {
                   I agree to the{" "}
                   <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-accent font-medium">
                     Privacy Policy
+                  </a>{" "}
+                  and{" "}
+                  <a href="/returns-policy" target="_blank" rel="noreferrer" className="text-accent font-medium">
+                    Returns &amp; Cancellation Policy
                   </a>
                 </span>
               </label>

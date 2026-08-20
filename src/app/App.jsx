@@ -26,9 +26,11 @@ import AdminOrders from "./pages/AdminOrders";
 import AdminConfigSettings from "./pages/AdminConfigSettings";
 import AdminConfigPrivacyPolicy from "./pages/AdminConfigPrivacyPolicy";
 import AdminConfigCookiePolicy from "./pages/AdminConfigCookiePolicy";
+import AdminConfigReturnsPolicy from "./pages/AdminConfigReturnsPolicy";
 import OrderReview from "./pages/OrderReview";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import CookiePolicyPage from "./pages/CookiePolicyPage";
+import ReturnsPolicyPage from "./pages/ReturnsPolicyPage";
 
 export default function App() {
   return (
@@ -43,6 +45,7 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+              <Route path="/returns-policy" element={<ReturnsPolicyPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
@@ -204,6 +207,14 @@ export default function App() {
                 element={
                   <ProtectedRoute role="admin">
                     <AdminConfigCookiePolicy />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/configuration/returns-policy"
+                element={
+                  <ProtectedRoute role="admin">
+                    <AdminConfigReturnsPolicy />
                   </ProtectedRoute>
                 }
               />

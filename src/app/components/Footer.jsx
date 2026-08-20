@@ -73,7 +73,10 @@ export default function Footer({ scrollTo }) {
                 </a>
               </li>
               <li className="text-sm text-primary-foreground/60">
-                South Africa · Ships nationwide
+                1239 Crow&apos;s Nest, Featherbrook, Krugersdorp, South Africa
+              </li>
+              <li className="text-sm text-primary-foreground/60">
+                Ships nationwide
               </li>
               <li className="text-sm text-primary-foreground/60">
                 Turnaround: 7–10 working days
@@ -84,7 +87,8 @@ export default function Footer({ scrollTo }) {
 
         <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-xs text-primary-foreground/30">
-            © {new Date().getFullYear()} Kingdom Thread Co. All rights reserved.
+            © {new Date().getFullYear()} Kingdom Thread Co, a trading name of Karen Kotze (sole proprietor). All
+            rights reserved.
           </p>
           <div className="flex items-center gap-4">
             {/* New tab (not in-page navigation) so this never disrupts
@@ -106,6 +110,14 @@ export default function Footer({ scrollTo }) {
               className="text-xs text-primary-foreground/50 hover:text-primary-foreground transition-colors"
             >
               Cookie Policy
+            </a>
+            <a
+              href="/returns-policy"
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-primary-foreground/50 hover:text-primary-foreground transition-colors"
+            >
+              Returns &amp; Cancellation
             </a>
           </div>
           <p
