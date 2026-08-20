@@ -78,7 +78,7 @@ export default function ProductQuoteStart() {
       <form className="flex flex-col gap-5" onSubmit={handleContinue}>
         <FormSelect label="Size" value={size} onChange={(e) => setSize(e.target.value)} options={product.sizes} />
         <FormSelect
-          label="Colour"
+          label="Colour / Design"
           value={colour}
           onChange={(e) => setColour(e.target.value)}
           options={product.colours}
