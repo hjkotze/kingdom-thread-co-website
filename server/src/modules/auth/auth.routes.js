@@ -22,7 +22,9 @@ router.post("/verify-email", controller.verifyEmail);
 // /admin/auth too. Same email-quota reasoning for the rate limit.
 router.post("/forgot-password", rateLimit("forgot-password", { max: 5, windowMinutes: 60 }), controller.forgotPassword);
 router.post("/reset-password", controller.resetPassword);
-router.post("/login", controller.loginCustomer);
+// Anti-brute-force, not anti-spam like the limits above — generous enough
+// not to lock out a genuine customer mistyping their password a few times.
+router.post("/login", rateLimit("customer-login", { max: 10, windowMinutes: 15 }), controller.loginCustomer);
 router.post("/logout", controller.logout);
 router.get("/me", controller.me);
 router.patch("/profile", controller.updateProfile);

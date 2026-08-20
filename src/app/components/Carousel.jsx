@@ -16,7 +16,7 @@ export default function Carousel({ images, alt, imageClassName = "w-full h-full 
 
   return (
     <div className="relative w-full h-full group/carousel">
-      <img src={images[clamped].url} alt={alt} className={imageClassName} />
+      <img src={images[clamped].url} alt={alt} loading="lazy" className={imageClassName} />
 
       {images.length > 1 && (
         <>

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const env = require("./config/env");
 const sessionMiddleware = require("./middleware/session");
 const errorHandler = require("./middleware/errorHandler");
@@ -14,6 +15,12 @@ const app = express();
 ensureInitialAdmin().catch((err) => console.error("Initial admin bootstrap failed:", err.message));
 
 app.set("trust proxy", 1); // HostKing likely terminates TLS at a proxy in front of the app
+
+// Sets HSTS, X-Frame-Options, X-Content-Type-Options, a default CSP, etc.
+// This is a pure JSON/file API (no HTML rendered here), so the default CSP
+// is effectively inert for normal responses — it's still worth having for
+// the download/PDF endpoints and as defense-in-depth.
+app.use(helmet());
 
 app.use(
   cors({

@@ -60,11 +60,6 @@ export default function Hero({ scrollTo }) {
   return (
     <section id="hero" className="pt-28 flex items-center overflow-hidden bg-background">
       <div className="absolute inset-0 bg-muted">
-        <img
-          src=""
-          alt="Soft textured woven fabric close-up"
-          className="w-full h-full object-cover opacity-25"
-        />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
       </div>
 

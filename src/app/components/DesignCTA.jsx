@@ -19,6 +19,7 @@ export default function DesignCTA({ scrollTo }) {
           src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&h=800&fit=crop&auto=format"
           alt=""
           aria-hidden
+          loading="lazy"
           className="w-full h-full object-cover"
         />
       </div>
@@ -70,6 +71,7 @@ export default function DesignCTA({ scrollTo }) {
               <img
                 src={img.src}
                 alt={img.alt}
+                loading="lazy"
                 className="w-full h-full object-cover opacity-80"
               />
             </div>
