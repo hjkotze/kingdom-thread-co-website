@@ -270,7 +270,7 @@ the only way to create one.
 
 A handful of settings live in MySQL, not NocoDB, and would otherwise leave
 their tables **empty** (breaking checkout or leaving legal pages blank) on
-a fresh deploy. Four migrations — all already committed to `main`, nothing
+a fresh deploy. Five migrations — all already committed to `main`, nothing
 left to author before a deploy — seed or correct real current values for
 these as part of step 4 (`knex migrate:latest`); no manual entry needed for
 any of them:
@@ -287,15 +287,16 @@ any of them:
   "FREIGHT" R150 default). Edit or add more from
   `/admin/configuration/settings` as needed.
 - **Privacy Policy** (seeded in `20260819100001_seed_vat_rate_and_policy_content.js`,
-  then corrected in `20260820100001_fix_privacy_policy_payment_and_deletion_wording.js`)
+  then corrected in `20260820100001_fix_privacy_policy_payment_and_deletion_wording.js`,
+  then extended in `20260820100003_add_age_statement_to_privacy_policy.js`)
   — the second migration removes an earlier draft's inaccurate claim that
   PayFast/Yoco/PayPal are integrated (the real, current payment method is
   manual EFT + Proof of Payment) and makes the account-deletion rights
-  wording honest about being a manual, email-initiated process. On a fresh
-  database both migrations run in order, so this ends up correct
-  immediately — this second one only matters as a distinct step for
-  databases that already had the original (inaccurate) text seeded before
-  it existed, like dev did.
+  wording honest about being a manual, email-initiated process; the third
+  adds a brief age/minors statement. On a fresh database all three run in
+  order, so this ends up correct and complete immediately — the second and
+  third only matter as distinct steps for a database that already had an
+  earlier version of this text seeded before they existed, like dev did.
 - **Cookie Policy** (seeded in `20260819100001_seed_vat_rate_and_policy_content.js`)
   — unchanged since first seeded.
 - **Returns & Cancellation Policy** (`20260820100002_add_returns_policy_type.js`)
