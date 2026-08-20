@@ -6,8 +6,7 @@
 // password or run twice.
 const authService = require("../modules/auth/auth.service");
 const db = require("../config/db");
-
-const MIN_PASSWORD_LENGTH = 8;
+const { MIN_PASSWORD_LENGTH } = require("./passwordPolicy");
 
 async function ensureInitialAdmin() {
   const email = process.env.INITIAL_ADMIN_EMAIL;

@@ -4,6 +4,7 @@
 // Usage: npm run create-admin -- --email=you@domain.com --password=... --name="Your Name"
 const authService = require("../src/modules/auth/auth.service");
 const db = require("../src/config/db");
+const { MIN_PASSWORD_LENGTH } = require("../src/lib/passwordPolicy");
 
 function parseArgs() {
   const args = {};
@@ -18,6 +19,11 @@ async function main() {
   const { email, password, name } = parseArgs();
   if (!email || !password || !name) {
     console.error('Usage: npm run create-admin -- --email=you@domain.com --password=... --name="Your Name"');
+    process.exitCode = 1;
+    return;
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    console.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
     process.exitCode = 1;
     return;
   }

@@ -3,9 +3,9 @@ const mailer = require("../../lib/mailer");
 const emailTemplates = require("../../lib/emailTemplates");
 const env = require("../../config/env");
 const { PROVINCES } = require("../../lib/address");
+const { MIN_PASSWORD_LENGTH } = require("../../lib/passwordPolicy");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
 const RESEND_COOLDOWN_MINUTES = 2;
 const RESET_COOLDOWN_MINUTES = 2;
 
