@@ -96,10 +96,11 @@ step 2.
 quotes, orders, messages, and accounts accumulated from testing — none of
 that belongs in production. Step 4 (`knex migrate:latest`) creates every
 table from scratch, empty, on this new database — that's the entire "data
-migration" this deploy needs. Three exceptions are seeded automatically by
-that same migration run (the current VAT rate, shipping rates, and the
-Privacy/Cookie Policy text — see step 6b) since those are real business
-content, not test data. Everything else production and dev share comes
+migration" this deploy needs. Four exceptions are seeded automatically by
+that same migration run (the current VAT rate, shipping rates, and all
+three policy pages — Privacy, Cookie, Returns & Cancellation — see step
+6b) since those are real business content, not test data. Everything else
+production and dev share comes
 from the NocoDB-hosted catalogue (see Architecture recap); anything still
 empty after migrations (just site turnaround text) needs to be re-entered
 deliberately, also step 6b.
@@ -269,8 +270,10 @@ the only way to create one.
 
 A handful of settings live in MySQL, not NocoDB, and would otherwise leave
 their tables **empty** (breaking checkout or leaving legal pages blank) on
-a fresh deploy. Two migrations seed real current values for these as part
-of step 4 (`knex migrate:latest`) — no manual entry needed for any of them:
+a fresh deploy. Four migrations — all already committed to `main`, nothing
+left to author before a deploy — seed or correct real current values for
+these as part of step 4 (`knex migrate:latest`); no manual entry needed for
+any of them:
 
 - **VAT rate** (`20260819100001_seed_vat_rate_and_policy_content.js`) —
   seeded at 15% (South Africa's current rate as of this writing). Without
@@ -283,15 +286,31 @@ of step 4 (`knex migrate:latest`) — no manual entry needed for any of them:
   with the two rates currently configured in dev ("Extra freight" R300,
   "FREIGHT" R150 default). Edit or add more from
   `/admin/configuration/settings` as needed.
-- **Privacy Policy / Cookie Policy** (also in
-  `20260819100001_seed_vat_rate_and_policy_content.js`) — seeded with the
-  real current text at `/admin/configuration/privacy-policy` and
-  `/admin/configuration/cookie-policy`.
+- **Privacy Policy** (seeded in `20260819100001_seed_vat_rate_and_policy_content.js`,
+  then corrected in `20260820100001_fix_privacy_policy_payment_and_deletion_wording.js`)
+  — the second migration removes an earlier draft's inaccurate claim that
+  PayFast/Yoco/PayPal are integrated (the real, current payment method is
+  manual EFT + Proof of Payment) and makes the account-deletion rights
+  wording honest about being a manual, email-initiated process. On a fresh
+  database both migrations run in order, so this ends up correct
+  immediately — this second one only matters as a distinct step for
+  databases that already had the original (inaccurate) text seeded before
+  it existed, like dev did.
+- **Cookie Policy** (seeded in `20260819100001_seed_vat_rate_and_policy_content.js`)
+  — unchanged since first seeded.
+- **Returns & Cancellation Policy** (`20260820100002_add_returns_policy_type.js`)
+  — a third policy type alongside Privacy/Cookies (this migration also
+  widens the `policies.type` enum to allow it). Covers the made-to-order
+  cooling-off exemption under the ECT Act and a 7-day defect/replacement
+  window. Edit the text from `/admin/configuration/returns-policy` as
+  needed — it's business content, same as the other two policies, not
+  meant to be authoritative forever as written here.
 
-All three seed migrations only insert when their table is empty (or, for
-policies, when content is still `null`) — safe to run against dev's
-existing database (confirmed: no-op, no duplicates) and will never
-overwrite an admin edit made before a later deploy.
+All of these are safe to run against a database that already has this
+content — they only insert/update when the table is empty, content is
+still the known-old text, or (for the enum widening) the column doesn't
+already allow the new value — confirmed via direct testing against dev:
+no-ops, no duplicates, no clobbered admin edits.
 
 Still genuinely empty after migrations and worth setting deliberately
 before taking real orders, at `/admin/configuration/settings`:
@@ -411,9 +430,10 @@ no system-wide Node install, since cron won't see the Selector's version.
 
 ## Pre-launch content checklist (unrelated to infra, but easy to miss)
 
-- VAT rate, shipping rates, and Privacy/Cookie Policy text are all seeded
-  automatically by migrations (step 6b) — just confirm they're actually
-  correct for launch, since "seeded" isn't the same as "reviewed."
+- VAT rate, shipping rates, and all three policy pages (Privacy, Cookie,
+  Returns & Cancellation) are all seeded automatically by migrations (step
+  6b) — just confirm they're actually correct for launch, since "seeded"
+  isn't the same as "reviewed."
 - Double check no dev/test accounts (`admin@wovenblankets.test`,
   `jane@example.com`, etc. — see `DEV_CREDENTIALS.md`) exist in the
   production database — they won't, if step 1 was followed (fresh database,
